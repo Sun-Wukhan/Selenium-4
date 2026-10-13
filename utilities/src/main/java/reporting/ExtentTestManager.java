@@ -1,43 +1,43 @@
 package reporting;
 
-import com.relevantcodes.extentreports.ExtentReports;
-import com.relevantcodes.extentreports.ExtentTest;
+import com.aventstack.extentreports.ExtentTest;
 
-import java.util.HashMap;
-import java.util.Map;
+/**
+ * Keeps the Extent test for the current thread.
+ */
+public final class ExtentTestManager {
 
-public class ExtentTestManager {
+    private static final ThreadLocal<ExtentTest> TESTS = new ThreadLocal<>();
 
-    static Map<Integer, ExtentTest> extentTestMap = new HashMap<Integer, ExtentTest>();
-    private static ExtentReports extent = ExtentManager.getInstance();
-    private static ExtentReports extentUpdate = ExtentManager.getInstance();
+    private ExtentTestManager() {
+    }
 
+    /**
+     * Starts an Extent test and stores it for this thread.
+     *
+     * @param testName    method name shown in the report
+     * @param description class or scenario description
+     * @return the created test
+     */
+    public static synchronized ExtentTest startTest(String testName, String description) {
+        ExtentTest test = ExtentManager.getInstance().createTest(testName, description);
+        TESTS.set(test);
+        return test;
+    }
+
+    /**
+     * Returns the Extent test started on this thread.
+     *
+     * @return the current test, or null when none has been started
+     */
     public static synchronized ExtentTest getTest() {
-
-        return extentTestMap.get((int) (long) (Thread.currentThread().getId()));
+        return TESTS.get();
     }
 
+    /**
+     * Drops the current thread's test so the next method starts clean.
+     */
     public static synchronized void endTest() {
-        extent.endTest(extentTestMap.get((int) (long) (Thread.currentThread().getId())));
-    }
-    public static synchronized ExtentTest startTest(String testName) {
-
-        return startTest(testName, "");
-    }
-
-    public static synchronized ExtentTest startTestClass(String className,String testName) {
-        return startTest(className,testName, "");
-    }
-
-    public static synchronized ExtentTest startTest(String testName, String desc) {
-        ExtentTest test = extent.startTest(testName, desc);
-        extentTestMap.put((int) (long) (Thread.currentThread().getId()), test);
-        return test;
-    }
-
-    public static synchronized ExtentTest startTest(String className,String testName, String desc) {
-        ExtentTest test = extentUpdate.startTest(testName, desc);
-        extentTestMap.put((int) (long) (Thread.currentThread().getId()), test);
-        return test;
+        TESTS.remove();
     }
 }

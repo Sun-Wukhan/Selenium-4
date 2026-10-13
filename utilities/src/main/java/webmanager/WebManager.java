@@ -1,9 +1,7 @@
 package webmanager;
 
-import com.relevantcodes.extentreports.ExtentReports;
-import com.relevantcodes.extentreports.LogStatus;
-import io.github.bonigarcia.wdm.WebDriverManager;
-import org.codehaus.plexus.util.FileUtils;
+import com.aventstack.extentreports.ExtentTest;
+import com.aventstack.extentreports.MediaEntityBuilder;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.TakesScreenshot;
@@ -11,369 +9,268 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
+import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
-import org.openqa.selenium.ie.InternetExplorerDriver;
-import org.openqa.selenium.ie.InternetExplorerOptions;
-import org.openqa.selenium.opera.OperaDriver;
-import org.openqa.selenium.opera.OperaOptions;
-import org.openqa.selenium.remote.DesiredCapabilities;
-import org.openqa.selenium.remote.RemoteWebDriver;
-import org.openqa.selenium.safari.SafariDriver;
-import org.openqa.selenium.safari.SafariOptions;
-import org.testng.ITestContext;
+import org.openqa.selenium.firefox.GeckoDriverService;
+import org.openqa.selenium.manager.SeleniumManager;
+import org.openqa.selenium.manager.SeleniumManagerOutput;
 import org.testng.ITestResult;
-import org.testng.annotations.*;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.AfterSuite;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.BeforeSuite;
 import reporting.ExtentManager;
 import reporting.ExtentTestManager;
 
 import java.io.File;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.reflect.Method;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.Duration;
-import java.util.Calendar;
-import java.util.Date;
+import java.util.List;
 
+/**
+ * Starts a local browser with Selenium Manager and records each test in Extent.
+ */
 public class WebManager {
 
-    public static WebDriver driver = null;
-    public static String browserName = System.getProperty("browserName", "chrome");
-    public static final String url = System.getProperty("url", "https://www.amazon.ca/ref=nav_logo");
-    public static String os = System.getProperty("os", "linux");
-    public static  String cloudPlatformName = System.getProperty("cloudPlatformName", "browserstack");
-    public static final String AUTOMATE_USERNAME = System.getProperty("AUTOMATE_USERNAME","/////");
-    public static final String AUTOMATE_ACCESS_KEY = System.getProperty("AUTOMATE_ACCESS_KEY", "/////");
-    public static String platform = System.getProperty("platform", "local");
+    private static final ThreadLocal<WebDriver> DRIVERS = new ThreadLocal<>();
+    private static final String URL = System.getProperty(
+            "url", "https://weathershopper.pythonanywhere.com/moisturizer");
+    private static final String BROWSER = System.getProperty("browser", "chrome");
+    private static final boolean HEADLESS = Boolean.parseBoolean(System.getProperty("headless", "false"));
+    private static final Duration PAGE_LOAD_TIMEOUT = Duration.ofSeconds(30);
 
     /**
-     * **************************************************
-     * ********** Start Of Reporting Utilities **********
-     * **************************************************
-    **/
+     * Returns the browser selected with {@code -Dbrowser}.
+     *
+     * @return chrome, firefox, or edge
+     */
+    public static String browser() {
+        return BROWSER;
+    }
 
-    public static ExtentReports extent;
+    /**
+     * Returns the driver for the current thread.
+     *
+     * @return the active WebDriver
+     */
+    public static WebDriver getDriver() {
+        return DRIVERS.get();
+    }
 
+    /**
+     * Creates the Extent report before any test runs.
+     */
     @BeforeSuite
-    public void extentSetup(ITestContext context) {
-        ExtentManager.setOutputDirectory(context);
-        extent = ExtentManager.getInstance();
-
+    public void extentSetup() {
+        ExtentManager.getInstance();
     }
 
+    /**
+     * Opens the catalog and starts the Extent test for this method.
+     *
+     * @param method the test method about to run
+     */
     @BeforeMethod
-    public void startExtent(Method method) {
+    public void setUp(Method method) {
+        WebDriver webDriver = createDriver();
+        DRIVERS.set(webDriver);
+        webDriver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
+        if (!HEADLESS) {
+            webDriver.manage().window().maximize();
+        }
+        webDriver.get(URL);
+
         String className = method.getDeclaringClass().getSimpleName();
-        ExtentTestManager.startTest(method.getName());
-        ExtentTestManager.getTest().assignCategory(className);
+        ExtentTest test = ExtentTestManager.startTest(method.getName(), className);
+        test.assignCategory(className);
     }
 
-    protected String getStackTrace(Throwable t) {
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        t.printStackTrace(pw);
-        return sw.toString();
+    /**
+     * Embeds a named screenshot of the current page in the Extent report.
+     *
+     * @param name caption shown beside the image
+     */
+    public static void captureScreenshot(String name) {
+        ExtentTest test = ExtentTestManager.getTest();
+        String base64 = screenshotBase64();
+        if (test == null || base64 == null) {
+            return;
+        }
+        test.info(name, MediaEntityBuilder.createScreenCaptureFromBase64String(base64).build());
     }
 
-    public static void captureFailScreenshot(WebDriver driver, String screenshotName){
-
-        DateFormat df = new SimpleDateFormat("(MM.dd.yyyy-HH mma)");
-        Date date = new Date();
-        df.format(date);
-
-        File file = ((TakesScreenshot)driver).getScreenshotAs(OutputType.FILE);
+    /**
+     * Attaches a pass or fail screenshot, then closes the browser.
+     *
+     * @param result TestNG result for the method that just finished
+     */
+    @AfterMethod(alwaysRun = true)
+    public void afterEachTestMethod(ITestResult result) {
         try {
-            FileUtils.copyFile(file, new File(System.getProperty("user.dir")+ "/Failedscreenshots/"+screenshotName+" "+df.format(date)+".png"));
-            System.out.println("Screenshot captured");
-        } catch (Exception e) {
-            System.out.println("Exception while taking screenshot "+e.getMessage());;
+            attachResult(result);
+        } finally {
+            WebDriver webDriver = getDriver();
+            if (webDriver != null) {
+                webDriver.quit();
+            }
+            DRIVERS.remove();
+            ExtentTestManager.endTest();
         }
     }
 
-    public static void captureScreenshot(WebDriver driver, String screenshotName){
-
-        DateFormat df = new SimpleDateFormat("(MM.dd.yyyy-HH mma)");
-        Date date = new Date();
-        df.format(date);
-
-        File file = ((TakesScreenshot)driver).getScreenshotAs(OutputType.FILE);
-        try {
-            FileUtils.copyFile(file, new File(System.getProperty("user.dir")+ "/screenshots/"+screenshotName+" "+df.format(date)+".png"));
-            System.out.println("Screenshot captured");
-        } catch (Exception e) {
-            System.out.println("Exception while taking screenshot "+e.getMessage());;
-        }
-    }
-
-    @AfterMethod
-    public void afterEachTestMethod(ITestResult result) throws Exception {
-
-        ExtentTestManager.getTest().getTest().setStartedTime(getTime(result.getStartMillis()));
-        ExtentTestManager.getTest().getTest().setEndedTime(getTime(result.getEndMillis()));
-
-        for (String group : result.getMethod().getGroups()) {
-            ExtentTestManager.getTest().assignCategory(group);
-        }
-
-        if (result.getStatus() == ITestResult.SUCCESS) {
-            ExtentTestManager.getTest().log(LogStatus.PASS, "Test Passed");
-        } else if (result.getStatus() == ITestResult.FAILURE) {
-            ExtentTestManager.getTest().log(LogStatus.FAIL, getStackTrace(result.getThrowable()));
-            captureFailScreenshot(driver, result.getName());
-        } else if (result.getStatus() == ITestResult.SKIP) {
-            ExtentTestManager.getTest().log(LogStatus.SKIP, "Test Skipped");
-        }
-
-        driver.quit(); 
-    }
-
-    @AfterTest
-    public void endReport(){
-        ExtentTestManager.endTest();
-    }
-
-
-
-    @AfterSuite
+    /**
+     * Flushes the Extent HTML report after the suite.
+     */
+    @AfterSuite(alwaysRun = true)
     public void generateReport() {
-        extent.close();
-    }
-    private Date getTime(long millis) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTimeInMillis(millis);
-        return calendar.getTime();
+        ExtentManager.flush();
     }
 
-    @BeforeMethod
-    public void setUp() throws MalformedURLException {
-
-        if(platform.equals("local")) {
-            if (browserName.equals("chrome")) {
-                getChromeDriver();
-            } else if (browserName.equals("firefox")) {
-                getFireFoxDriver();
-            } else if (browserName.equals("explorer")) {
-                getInternetExplorerDriver();
-            } else if (browserName.equals("safari")) {
-                getSafariDriver();
-            } else if (browserName.equals("opera")) {
-                getOperaDriver();
-            } else if (browserName.equals("edge")) {
-                getEdgeDriver();
-            }
+    private void attachResult(ITestResult result) {
+        ExtentTest test = ExtentTestManager.getTest();
+        if (test == null) {
+            return;
         }
-
-        else if(platform.equals("cloud")) {
-            if(cloudPlatformName.equals("browserstack")) {
-                getDriverForBrowserStack();
-            }
-            else if(cloudPlatformName.equals("saucelab")){
-                getDriverForSauceLab();
-            }
+        for (String group : result.getMethod().getGroups()) {
+            test.assignCategory(group);
         }
-
-
-        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(60));
-        driver.manage().timeouts().scriptTimeout(Duration.ofMinutes(1));
-        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(10));
-        driver.manage().window().maximize();
-        driver.get(url);
-
+        String base64 = screenshotBase64();
+        if (result.getStatus() == ITestResult.FAILURE) {
+            if (base64 == null) {
+                test.fail(result.getThrowable());
+            } else {
+                test.fail(result.getThrowable(),
+                        MediaEntityBuilder.createScreenCaptureFromBase64String(base64).build());
+            }
+        } else if (result.getStatus() == ITestResult.SUCCESS) {
+            if (base64 == null) {
+                test.pass("Test passed");
+            } else {
+                test.pass("Test passed",
+                        MediaEntityBuilder.createScreenCaptureFromBase64String(base64).build());
+            }
+        } else if (result.getStatus() == ITestResult.SKIP) {
+            test.skip("Test skipped");
+        }
     }
 
-    public static WebDriver getChromeDriver() {
+    private static String screenshotBase64() {
+        WebDriver webDriver = getDriver();
+        if (!(webDriver instanceof TakesScreenshot)) {
+            return null;
+        }
+        try {
+            return ((TakesScreenshot) webDriver).getScreenshotAs(OutputType.BASE64);
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
 
-        ChromeDriverService cdservice = new ChromeDriverService.Builder()
-                .withSilent(true)
-                .usingAnyFreePort()
-                .build();
+    private static WebDriver createDriver() {
+        return switch (BROWSER.toLowerCase()) {
+            case "chrome" -> createChromeDriver();
+            case "firefox" -> createFirefoxDriver();
+            case "edge" -> createEdgeDriver();
+            default -> throw new IllegalArgumentException("Unsupported browser: " + BROWSER);
+        };
+    }
 
+    private static WebDriver createChromeDriver() {
         ChromeOptions options = new ChromeOptions();
         options.setAcceptInsecureCerts(true);
-        options.setCapability("browserVersion", "108.0.5359.124");
-        options.addArguments("--ignore-certificate-errors");
-        options.addArguments("--disable-infobars"); // disabling infobars
-        options.addArguments("--disable-extensions"); // disabling extensions
-        options.addArguments("enable-automation");
-        options.addArguments("--disable-browser-side-navigation");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--dns-prefetch-disable");
         options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
-        options.addArguments("--disable-dev-shm-usage"); // overcome limited resource problems
-        options.addArguments("--no-sandbox"); // Bypass OS security model
-        options.addArguments("--disable-setuid-sandbox");
-
-
-        if(os.equals("mac")) {
-            WebDriverManager.chromedriver().setup();
-            WebDriverManager.chromedriver().driverVersion("101.0.4951.64-1").setup();
-            driver = new ChromeDriver(cdservice, options);
+        options.addArguments("--window-size=1440,900");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--no-sandbox");
+        if (HEADLESS) {
+            options.addArguments("--headless=new");
         }
-        else if(os.equals("windows")){
-            WebDriverManager.chromedriver().setup();
-            WebDriverManager.chromedriver().driverVersion("101.0.4951.64-1").setup();
-            driver = new ChromeDriver(options);
-        } else if(os.equals("linux")) {
-            WebDriverManager.chromedriver().setup();
-            WebDriverManager.chromedriver().driverVersion("101.0.4951.64-1").setup();
-            driver = new ChromeDriver(options);
-        } else {
-            System.out.println("No OS found");
-        }
-     
-        return driver;
+        SeleniumManagerOutput.Result managed = resolveBrowser("chrome");
+        applyBrowserBinary(options, managed);
+        ChromeDriverService service = new ChromeDriverService.Builder()
+                .usingDriverExecutable(new File(managed.getDriverPath()))
+                .build();
+        return new ChromeDriver(service, options);
     }
 
-    public static WebDriver getFireFoxDriver() {
-
+    private static WebDriver createFirefoxDriver() {
         FirefoxOptions options = new FirefoxOptions();
         options.setAcceptInsecureCerts(true);
-        options.setCapability("browserVersion", "latest");
-        options.addArguments("--incognito");
-        options.addArguments("--start-maximized");
-        options.addArguments("--ignore-certificate-errors");
-        options.addArguments("--ignore-ssl-errors");
-        options.addArguments("--disable-web-security");
-        options.addArguments("--private");
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-
-        if(os.equals("mac")) {
-            WebDriverManager.firefoxdriver().setup();
-            WebDriverManager.firefoxdriver().driverVersion("92.0").setup();
-            driver = new FirefoxDriver(options);
+        options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+        options.addArguments("--width=1440");
+        options.addArguments("--height=900");
+        if (HEADLESS) {
+            options.addArguments("-headless");
         }
-        else if(os.equals("windows")){
-            WebDriverManager.firefoxdriver().setup();
-            WebDriverManager.firefoxdriver().driverVersion("92.0").setup();
-            driver = new FirefoxDriver(options);
-        }
-
-        return driver;
+        SeleniumManagerOutput.Result managed = resolveBrowser("firefox");
+        applyBrowserBinary(options, managed);
+        GeckoDriverService service = new GeckoDriverService.Builder()
+                .usingDriverExecutable(new File(managed.getDriverPath()))
+                .build();
+        return new FirefoxDriver(service, options);
     }
 
-    public static WebDriver getInternetExplorerDriver() {
-
-        InternetExplorerOptions options = new InternetExplorerOptions();
-        options.setAcceptInsecureCerts(true);
-        options.setCapability("browserVersion", "latest");
-        options.ignoreZoomSettings();
-        options.useCreateProcessApiToLaunchIe();
-        options.addCommandSwitches("-k");
-
-        if(os.equals("mac")) {
-            WebDriverManager.iedriver().setup();
-            WebDriverManager.iedriver().driverVersion("11").setup();
-            driver = new InternetExplorerDriver(options);
-        }
-
-        else if(os.equals("windows")){
-            WebDriverManager.firefoxdriver().setup();
-            WebDriverManager.firefoxdriver().driverVersion("11").setup();
-            driver = new InternetExplorerDriver(options);
-        }
-
-        return driver;
-    }
-
-    public static WebDriver getSafariDriver() {
-
-        SafariOptions options = new SafariOptions();
-        options.setAcceptInsecureCerts(true);
-        options.setCapability("browserVersion", "latest");
-
-        if(os.equals("mac")) {
-            WebDriverManager.safaridriver().setup();
-            WebDriverManager.safaridriver().driverVersion("11").setup();
-            driver = new SafariDriver(options);
-        }
-
-        else if(os.equals("windows")){
-            WebDriverManager.safaridriver().setup();
-            WebDriverManager.safaridriver().driverVersion("15").setup();
-            driver = new SafariDriver(options);
-        }
-
-        return driver;
-    }
-
-    public static WebDriver getOperaDriver() {
-
-        OperaOptions options = new OperaOptions();
-        options.setAcceptInsecureCerts(true);
-        options.setCapability("browserVersion", "latest");
-
-        if(os.equals("mac")) {
-            WebDriverManager.operadriver().setup();
-            WebDriverManager.operadriver().driverVersion("latest").setup();
-            driver = new OperaDriver(options);
-        }
-
-        else if(os.equals("windows")){
-            WebDriverManager.operadriver().setup();
-            WebDriverManager.operadriver().driverVersion("latest").setup();
-            driver = new OperaDriver(options);
-        }
-
-        return driver;
-    }
-
-    public static WebDriver getEdgeDriver() {
-
+    private static WebDriver createEdgeDriver() {
         EdgeOptions options = new EdgeOptions();
         options.setAcceptInsecureCerts(true);
-        options.setCapability("browserVersion", "latest");
-        options.addArguments("--incognito");
-        options.addArguments("--start-maximized");
-        options.addArguments("ignore-certificate-errors");
-        options.addArguments("--ignore-ssl-errors");
-        options.addArguments("--disable-web-security");
-
-        if(os.equals("mac")) {
-            WebDriverManager.chromedriver().setup();
-            WebDriverManager.chromedriver().driverVersion("92.0").setup();
-            driver = new EdgeDriver(options);
+        options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
+        options.addArguments("--window-size=1440,900");
+        if (HEADLESS) {
+            options.addArguments("--headless=new");
         }
-        else if(os.equals("windows")){
-            WebDriverManager.chromedriver().setup();
-            WebDriverManager.chromedriver().driverVersion("92.0").setup();
-            driver = new EdgeDriver(options);
+        SeleniumManagerOutput.Result managed = resolveBrowser("edge");
+        applyBrowserBinary(options, managed);
+        EdgeDriverService service = new EdgeDriverService.Builder()
+                .usingDriverExecutable(new File(managed.getDriverPath()))
+                .build();
+        return new EdgeDriver(service, options);
+    }
+
+    /**
+     * Resolves a browser and driver, ignoring outdated drivers already on PATH.
+     *
+     * @param browserName chrome, firefox, or edge
+     * @return Selenium Manager paths for that browser
+     */
+    private static SeleniumManagerOutput.Result resolveBrowser(String browserName) {
+        SeleniumManagerOutput.Result result = SeleniumManager.getInstance().getBinaryPaths(List.of(
+                "--browser", browserName,
+                "--skip-driver-in-path"));
+        String driverPath = result.getDriverPath();
+        if (driverPath == null || driverPath.isBlank()) {
+            throw new IllegalStateException(
+                    "Selenium Manager did not return a " + browserName + " driver: " + result.getMessage());
         }
-
-        return driver;
+        return result;
     }
 
-    public static WebDriver getDriverForBrowserStack() throws MalformedURLException {
-        DesiredCapabilities caps = new DesiredCapabilities();
-        caps.setCapability("os_version", "10");
-        caps.setCapability("resolution", "2048x1536");
-        caps.setCapability("browser", "Chrome");
-        caps.setCapability("browser_version", "latest-beta");
-        caps.setCapability("os", "Windows");
-
-        driver = new RemoteWebDriver(new URL("https://" + AUTOMATE_USERNAME + ":" + AUTOMATE_ACCESS_KEY + "@hub-cloud.browserstack.com/wd/hub"),caps );
-
-        return driver;
+    /**
+     * Points Chrome or Edge at the binary Selenium Manager selected.
+     *
+     * @param options Chrome or Edge options
+     * @param managed resolved browser and driver paths
+     */
+    private static void applyBrowserBinary(ChromiumOptions<?> options, SeleniumManagerOutput.Result managed) {
+        String browserPath = managed.getBrowserPath();
+        if (browserPath != null && !browserPath.isBlank()) {
+            options.setBinary(browserPath);
+        }
     }
 
-
-    public static WebDriver getDriverForSauceLab() throws MalformedURLException {
-
-        DesiredCapabilities caps = new DesiredCapabilities();
-        caps.setCapability("os_version", "10");
-        caps.setCapability("browser", "Chrome");
-        caps.setCapability("browser_version", "latest-beta");
-        caps.setCapability("os", "Windows");
-
-        driver = new RemoteWebDriver(new URL("http://" + AUTOMATE_USERNAME + ":" + AUTOMATE_ACCESS_KEY + "@ondemand.saucelabs.com:80/wd/hub"), caps);
-
-        return driver;
+    /**
+     * Points Firefox at the binary Selenium Manager selected.
+     *
+     * @param options Firefox options
+     * @param managed resolved browser and driver paths
+     */
+    private static void applyBrowserBinary(FirefoxOptions options, SeleniumManagerOutput.Result managed) {
+        String browserPath = managed.getBrowserPath();
+        if (browserPath != null && !browserPath.isBlank()) {
+            options.setBinary(browserPath);
+        }
     }
-
 }

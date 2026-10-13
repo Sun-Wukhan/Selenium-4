@@ -1,28 +1,26 @@
 package reporting;
 
-import com.relevantcodes.extentreports.LogStatus;
-import org.apache.commons.lang3.StringUtils;
-import org.openqa.selenium.WebDriver;
+import com.aventstack.extentreports.ExtentTest;
 import org.testng.Reporter;
 
-public class TestLogger {
+/**
+ * Writes a step to both the TestNG console and the current Extent test.
+ */
+public final class TestLogger {
 
-    public static void log(LogStatus fail, final String message){
-        Reporter.log(message,true);
-        ExtentTestManager.getTest().log(LogStatus.INFO, message + "<br>");
-    }
-    public static void log(final String message){
-        Reporter.log(message,true);
-        ExtentTestManager.getTest().log(LogStatus.INFO, message + "<br>");
-    }
-    public static void log(final StringUtils message){
-        Reporter.log(message + "<br>",true);
-        ExtentTestManager.getTest().log(LogStatus.INFO, message + "<br>");
-    }
-    public static void log(final String message, WebDriver driver){
-        Reporter.log(message,true);
-        ExtentTestManager.getTest().log(LogStatus.INFO, message + "<br>");
+    private TestLogger() {
     }
 
-
+    /**
+     * Logs an informational step.
+     *
+     * @param message text to record
+     */
+    public static void log(final String message) {
+        Reporter.log(message, true);
+        ExtentTest test = ExtentTestManager.getTest();
+        if (test != null) {
+            test.info(message);
+        }
+    }
 }

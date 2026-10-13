@@ -1,0 +1,8 @@
+target/
+Extent-Report/
+screenshots/
+Failedscreenshots/
+recordings/
+.idea/
+*.iml
+.DS_Store

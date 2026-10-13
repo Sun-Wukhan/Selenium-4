@@ -1,0 +1,10 @@
+.git
+.idea
+**/.idea
+**/target
+*.iml
+.DS_Store
+client/Extent-Report
+screenshots
+Failedscreenshots
+recordings

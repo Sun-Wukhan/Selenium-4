@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.util.Date;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
-import java.util.function.Function;
 
 public class NavBot {
 
@@ -88,9 +87,18 @@ public class NavBot {
         TestLogger.log("Text Sent to " + webElementName);
     }
 
+    /**
+     * Waits until the element can be clicked, then clicks it.
+     *
+     * @param element     target element
+     * @param elementName name written to the report
+     */
     public static void click(WebElement element, String elementName) {
         TestLogger.log("Click " + elementName);
-        element.click();
+        WebDriver driver = ((WrapsDriver) element).getWrappedDriver();
+        new WebDriverWait(driver, Duration.ofSeconds(15))
+                .until(ExpectedConditions.elementToBeClickable(element))
+                .click();
         TestLogger.log("Clicked " + elementName);
     }
 
@@ -102,13 +110,21 @@ public class NavBot {
 
     }
 
+    /**
+     * Waits until the element is visible, then returns its text.
+     *
+     * @param webElement     target element
+     * @param webElementName name written to the report
+     * @return visible text
+     */
     public static String getText(WebElement webElement, String webElementName) {
-
         TestLogger.log("Getting text from " + webElementName);
-        String actualText = webElement.getText();
+        WebDriver driver = ((WrapsDriver) webElement).getWrappedDriver();
+        String actualText = new WebDriverWait(driver, Duration.ofSeconds(15))
+                .until(ExpectedConditions.visibilityOf(webElement))
+                .getText();
         TestLogger.log("Actual text: " + actualText);
         return actualText;
-
     }
 
     public static String getCurrentUrl(String webElementName, WebDriver driver){
@@ -128,10 +144,15 @@ public class NavBot {
     }
 
 
-    public static void waitUntilElementIsPresentUsingIDLocator(WebDriver driver, WebElement elementID) {
-        WebDriverWait wait = new WebDriverWait(driver, 30);
-        wait.until(ExpectedConditions.presenceOfElementLocated((By) elementID));
-
+    /**
+     * Waits until the element is visible.
+     *
+     * @param driver  browser to wait on
+     * @param element element that should appear
+     */
+    public static void waitUntilElementIsPresentUsingIDLocator(WebDriver driver, WebElement element) {
+        new WebDriverWait(driver, Duration.ofSeconds(30))
+                .until(ExpectedConditions.visibilityOf(element));
     }
 
     public void fluentWait() {
@@ -242,16 +263,17 @@ public class NavBot {
         TestLogger.log("Time waiting: " + millis);
     }
 
+    /**
+     * Waits until document.readyState is complete.
+     *
+     * @param driver browser to wait on
+     */
     public static void waitForPageLoad(WebDriver driver) {
-        Wait<WebDriver> wait = new WebDriverWait(driver, 30);
-        wait.until(new Function<WebDriver, Boolean>() {
-            public Boolean apply(WebDriver driver) {
-                TestLogger.log("Current Window State: "
-                        + String.valueOf(((JavascriptExecutor) driver).executeScript("return document.readyState")));
-                return String
-                        .valueOf(((JavascriptExecutor) driver).executeScript("return document.readyState"))
-                        .equals("complete");
-            }
+        new WebDriverWait(driver, Duration.ofSeconds(30)).until(webDriver -> {
+            String state = String.valueOf(
+                    ((JavascriptExecutor) webDriver).executeScript("return document.readyState"));
+            TestLogger.log("Current Window State: " + state);
+            return "complete".equals(state);
         });
     }
 
@@ -264,13 +286,17 @@ public class NavBot {
 
     }
 
-    public static WebElement waitForElementToBeVisible(WebDriver driver, WebElement webElement, int seconds){
-        WebDriverWait wait = new WebDriverWait(driver, 30);
-
-        WebElement element = wait.until(ExpectedConditions.visibilityOf(webElement));
-
-        return element;
-
+    /**
+     * Waits until the element is visible.
+     *
+     * @param driver     browser to wait on
+     * @param webElement element that should become visible
+     * @param seconds    timeout in seconds
+     * @return the visible element
+     */
+    public static WebElement waitForElementToBeVisible(WebDriver driver, WebElement webElement, int seconds) {
+        return new WebDriverWait(driver, Duration.ofSeconds(seconds))
+                .until(ExpectedConditions.visibilityOf(webElement));
     }
 
 

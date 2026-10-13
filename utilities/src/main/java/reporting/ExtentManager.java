@@ -1,45 +1,53 @@
 package reporting;
 
-
-import com.aventstack.extentreports.reporter.ExtentHtmlReporter;
-import com.relevantcodes.extentreports.ExtentReports;
-import org.openqa.selenium.WebDriver;
-import org.testng.ITestContext;
-import org.testng.Reporter;
+import com.aventstack.extentreports.ExtentReports;
+import com.aventstack.extentreports.reporter.ExtentSparkReporter;
 import webmanager.WebManager;
 
-import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
-public class ExtentManager {
+/**
+ * Owns the single ExtentReports session and writes the Spark HTML report.
+ */
+public final class ExtentManager {
+
     private static ExtentReports extent;
-    private static ITestContext context;
 
-    WebDriver driver;
-
-    public static ExtentHtmlReporter htmlReporter = new ExtentHtmlReporter(System.getProperty("user.dir")+"/Extent-Report/" + WebManager.browserName + " ExtentReport.html");
-
-    public synchronized static ExtentReports getInstance(){
-        if(extent == null){
-            
-            File outputDirectory = new File(context.getOutputDirectory());
-            File resultDirectory = new File(outputDirectory.getParentFile(),"html");
-            extent = new ExtentReports(System.getProperty("user.dir")+"/Extent-Report/" + WebManager.browserName + " ExtentReport.html", false);
-            Reporter.log("Extent Report Directory"+ resultDirectory, true);
-            extent.addSystemInfo("Host Name", "Navid Khan")
-                    .addSystemInfo("Environment","QA")
-                    .addSystemInfo("User Name", "Team Khan");
-
-
-            extent.loadConfig(new File(System.getProperty("user.dir")+"/extent-config.xml"));
-        }
-
-        return extent;
-
+    private ExtentManager() {
     }
 
+    /**
+     * Returns the shared report, creating the Spark HTML file on first use.
+     *
+     * @return the process-wide ExtentReports instance
+     */
+    public static synchronized ExtentReports getInstance() {
+        if (extent == null) {
+            Path report = Path.of(System.getProperty("user.dir"), "target", "extent-report", "index.html");
+            try {
+                Files.createDirectories(report.getParent());
+            } catch (IOException exception) {
+                throw new IllegalStateException("Could not create Extent report directory", exception);
+            }
+            ExtentSparkReporter spark = new ExtentSparkReporter(report.toFile());
+            spark.config().setDocumentTitle("Weather Shopper");
+            spark.config().setReportName("Moisturizer tests");
+            extent = new ExtentReports();
+            extent.attachReporter(spark);
+            extent.setSystemInfo("Environment", "QA");
+            extent.setSystemInfo("Browser", WebManager.browser());
+        }
+        return extent;
+    }
 
-    public static void setOutputDirectory(ITestContext context){
-        ExtentManager.context = context;
-
+    /**
+     * Writes the HTML report to disk.
+     */
+    public static synchronized void flush() {
+        if (extent != null) {
+            extent.flush();
+        }
     }
 }
