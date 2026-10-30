@@ -30,6 +30,7 @@ public class MoisturizerPage {
     private static final By CART_COUNT = By.id("cart");
     private static final Pattern PRICE_DIGITS = Pattern.compile("(\\d+)");
     private static final Duration TIMEOUT = Duration.ofSeconds(15);
+    private static final int MAX_CATALOGUE_LOADS = 6;
 
     private final WebDriver driver;
 
@@ -72,11 +73,24 @@ public class MoisturizerPage {
      */
     public CatalogProduct cheapestMatching(String ingredient, Set<String> excludeNames) {
         String needle = ingredient.toLowerCase(Locale.ROOT);
-        return products().stream()
-                .filter(product -> product.name().toLowerCase(Locale.ROOT).contains(needle))
-                .filter(product -> !excludeNames.contains(product.name()))
-                .min(Comparator.comparingInt(CatalogProduct::price))
-                .orElseThrow(() -> new IllegalStateException("No moisturizer matching " + ingredient));
+        // The shop re-randomises its catalogue on every page load, so a given
+        // load may contain no matching product at all (seen in CI: a sunscreen
+        // load with no SPF-50). Reload for a fresh catalogue before giving up;
+        // the session cart survives the refresh.
+        for (int load = 1; ; load++) {
+            var match = products().stream()
+                    .filter(product -> product.name().toLowerCase(Locale.ROOT).contains(needle))
+                    .filter(product -> !excludeNames.contains(product.name()))
+                    .min(Comparator.comparingInt(CatalogProduct::price));
+            if (match.isPresent()) {
+                return match.get();
+            }
+            if (load == MAX_CATALOGUE_LOADS) {
+                throw new IllegalStateException("No moisturizer matching " + ingredient
+                        + " after " + MAX_CATALOGUE_LOADS + " catalogue loads");
+            }
+            driver.navigate().refresh();
+        }
     }
 
     /**
