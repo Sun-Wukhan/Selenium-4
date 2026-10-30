@@ -3,10 +3,14 @@
 [![CI](https://github.com/Sun-Wukhan/Selenium-4/actions/workflows/ci.yml/badge.svg)](https://github.com/Sun-Wukhan/Selenium-4/actions/workflows/ci.yml)
 
 A Selenium 4 / TestNG framework in Java 17 that tests the
-[Weather Shopper](https://weathershopper.pythonanywhere.com/) demo shop.
-The live suite buys moisturisers and checks the cart against the catalogue:
-the cheapest product's catalogue price must match its cart line, and the
-cheapest Aloe + Almond pair must sum to the cart total.
+[Weather Shopper](https://weathershopper.pythonanywhere.com/) demo shop end
+to end. The live suite (9 tests, run in parallel) covers the home page's
+temperature rule (below 19° buy moisturisers, above 34° buy sunscreens),
+both catalogues against the cart — cheapest Aloe + Almond moisturisers,
+cheapest SPF-30 + SPF-50 sunscreens — a full checkout that pays with a
+Stripe test card and verifies the confirmation page, and cart edge cases
+such as the empty cart. The latest Extent report from `master` is published
+at [sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/).
 
 Around that suite sits a `utilities` module of reusable framework helpers —
 browser management, Extent reporting, Excel and database data providers,
@@ -69,8 +73,8 @@ make test BROWSER=edge URL=https://weathershopper.pythonanywhere.com/sunscreen
 ├── pom.xml                  # parent POM: versions, dependency management
 ├── client/                  # the tests
 │   └── src/test/java/
-│       ├── page_objects/        # MoisturizerPage, CartPage, CatalogProduct
-│       ├── page_objects_test/   # PurchaseTest — the live suite
+│       ├── page_objects/        # HomePage, MoisturizerPage, SunscreenPage, CartPage, ConfirmationPage
+│       ├── page_objects_test/   # the live suite: purchase, sunscreen, home, checkout, edge cases
 │       ├── application_page_actions/  # NavBot (waits/clicks/cookies), Clank (AWT keys)
 │       ├── examples/            # utility usage examples (below)
 │       └── runner/buy.xml       # TestNG suite file Surefire runs
@@ -147,16 +151,30 @@ class to the suite file to run one.
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `master`
 and every pull request:
 
-- **test** — JDK 17 on Ubuntu, runs the suite headless in Chrome exactly as
-  `make test-headless` does, and uploads the Extent report and Surefire
-  results as an artifact, pass or fail.
+- **test** — JDK 17 on Ubuntu, a browser matrix (Chrome, Firefox, Edge,
+  all headless) running the suite exactly as `make test-headless` does, and
+  uploading the Extent report and Surefire results as an artifact per
+  browser, pass or fail.
 - **docker** — builds the `Dockerfile` image and runs the suite inside it
   (`make docker-test`).
+- **report** — on pushes to `master` only, publishes the Chrome run's
+  Extent report to GitHub Pages
+  ([sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/)).
+
+Within a run, the suite itself executes with TestNG `parallel="methods"`
+and three threads (`runner/buy.xml`); `WebManager`'s ThreadLocal drivers
+keep parallel methods in separate browsers. Dependabot watches the Maven,
+GitHub Actions and Docker dependencies weekly.
 
 ## Notes
 
 - The suite tests a live third-party demo site; a red build can mean the
   site changed or is down, not that the framework broke. Check the Extent
   artifact's screenshots first.
-- `client/recordings/` and `client/screenshots/` in the git history are
-  captures from the original 2023 runs. Fresh captures are gitignored.
+- The shop fails about 5% of payments at random, by design (its
+  confirmation page says so). `CheckoutTest` treats a `PAYMENT FAILED`
+  result as the designed flake it is and shops + pays once more before
+  failing.
+- Captures from the original 2023 runs (`.idea/`, `client/recordings/`,
+  `client/screenshots/`) were removed from the tree; they remain in the git
+  history. Fresh captures are gitignored.

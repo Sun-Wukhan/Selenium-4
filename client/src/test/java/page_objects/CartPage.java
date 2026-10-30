@@ -3,7 +3,10 @@ package page_objects;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +17,8 @@ public class CartPage {
 
     private static final By LINE = By.cssSelector("table.table tbody tr");
     private static final By TOTAL = By.id("total");
+    private static final By PAY_BUTTON = By.cssSelector("button.stripe-button-el");
+    private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
     private final WebDriver driver;
 
@@ -48,6 +53,80 @@ public class CartPage {
                 .map(CartLine::price)
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("Cart has no line for " + productName));
+    }
+
+    /**
+     * Returns how many line items the cart lists.
+     *
+     * @return number of rows in the cart table
+     */
+    public int lineCount() {
+        return lines().size();
+    }
+
+    /**
+     * Returns whether the cart lists no items.
+     *
+     * @return true when the cart table is empty
+     */
+    public boolean isEmpty() {
+        return lines().isEmpty();
+    }
+
+    /**
+     * Pays through the Stripe Checkout overlay the cart page embeds.
+     *
+     * <p>Clicks the "Pay with Card" button Stripe renders, fills the overlay
+     * form (which lives in a Stripe iframe) and submits it. Use Stripe's test
+     * card {@code 4242 4242 4242 4242}, any future expiry, any CVC and any
+     * ZIP. The shop randomly fails about 5% of payments by design; check
+     * {@link ConfirmationPage#isSuccess()} on the result.
+     *
+     * @param email      any syntactically valid email address
+     * @param cardNumber a Stripe test card number
+     * @param expiry     card expiry, {@code MM/YY} or later in the future
+     * @param cvc        any three-digit code
+     * @param zip        any ZIP code
+     * @return the confirmation page the payment submits to
+     */
+    public ConfirmationPage payWithCard(String email, String cardNumber, String expiry, String cvc, String zip) {
+        new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.elementToBeClickable(PAY_BUTTON))
+                .click();
+        switchToStripeFrame();
+        type(By.cssSelector("input[type='email']"), email);
+        type(By.xpath("//input[@placeholder='Card number']"), cardNumber);
+        type(By.xpath("//input[@placeholder='MM / YY']"), expiry);
+        type(By.xpath("//input[@placeholder='CVC']"), cvc);
+        type(By.xpath("//input[@placeholder='ZIP']"), zip);
+        new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.elementToBeClickable(
+                        By.xpath("//button[contains(normalize-space(.), 'Pay')]")))
+                .click();
+        driver.switchTo().defaultContent();
+        new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.urlContains("/confirmation"));
+        return new ConfirmationPage(driver);
+    }
+
+    private void switchToStripeFrame() {
+        new WebDriverWait(driver, TIMEOUT).until(webDriver ->
+                !webDriver.findElements(By.cssSelector(
+                        "iframe[name='stripe_checkout_app'], iframe.stripe_checkout_app")).isEmpty());
+        for (WebElement frame : driver.findElements(By.tagName("iframe"))) {
+            driver.switchTo().frame(frame);
+            if (!driver.findElements(By.cssSelector("input[type='email']")).isEmpty()) {
+                return;
+            }
+            driver.switchTo().defaultContent();
+        }
+        throw new IllegalStateException("Stripe Checkout overlay did not expose an email field");
+    }
+
+    private void type(By locator, String text) {
+        new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.visibilityOfElementLocated(locator))
+                .sendKeys(text);
     }
 
     /**
