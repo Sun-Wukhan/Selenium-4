@@ -129,18 +129,61 @@ public class CartPage {
     }
 
     private void fillZipWhenRevealed(String zip) {
+        // The ZIP input carries no usable placeholder, name or id (verified
+        // against the live overlay: it is labelled "ZIP Code" but matches no
+        // attribute locator), so after a brief direct attempt it is found by
+        // elimination: the one visible input that is not a known field.
         By zipField = By.xpath("//input[contains(translate(@placeholder, 'zip', 'ZIP'), 'ZIP')"
                 + " or @name='zip' or @id='zip']");
         try {
-            WebElement field = new WebDriverWait(driver, Duration.ofSeconds(15))
+            WebElement field = new WebDriverWait(driver, Duration.ofSeconds(3))
                     .until(ExpectedConditions.visibilityOfElementLocated(zipField));
-            field.sendKeys(zip);
-            if (!zip.equals(field.getAttribute("value"))) {
-                field.clear();
-                field.sendKeys(zip);
-            }
+            typeInto(field, zip);
+            return;
+        } catch (org.openqa.selenium.TimeoutException noDirectMatch) {
+            // Fall through to the elimination scan.
+        }
+        List<By> knownFields = List.of(
+                By.cssSelector("input[type='email']"),
+                By.xpath("//input[@placeholder='Card number']"),
+                By.xpath("//input[@placeholder='MM / YY']"),
+                By.xpath("//input[@placeholder='CVC']"));
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(15)).until(webDriver -> {
+                for (WebElement input : webDriver.findElements(By.tagName("input"))) {
+                    if (!input.isDisplayed() || isOneOf(input, knownFields)) {
+                        continue;
+                    }
+                    String type = input.getAttribute("type");
+                    if ("hidden".equals(type) || "submit".equals(type) || "button".equals(type)) {
+                        continue;
+                    }
+                    typeInto(input, zip);
+                    return zip.equals(input.getAttribute("value"));
+                }
+                return false;
+            });
         } catch (org.openqa.selenium.TimeoutException notAsked) {
             // This overlay configuration does not collect a ZIP code.
+        }
+    }
+
+    private boolean isOneOf(WebElement input, List<By> locators) {
+        for (By locator : locators) {
+            for (WebElement known : driver.findElements(locator)) {
+                if (known.equals(input)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private void typeInto(WebElement field, String text) {
+        field.sendKeys(text);
+        if (!text.equals(field.getAttribute("value"))) {
+            field.clear();
+            field.sendKeys(text);
         }
     }
 
