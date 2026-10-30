@@ -97,19 +97,51 @@ public class CartPage {
         switchToStripeFrame();
         type(By.cssSelector("input[type='email']"), email);
         type(By.xpath("//input[@placeholder='Card number']"), cardNumber);
-        // Entering the card number makes the overlay reveal a required
-        // "ZIP Code" field; leaving it empty blocks the payment silently.
-        typeIfPresent(By.xpath("//input[contains(@placeholder, 'ZIP')]"), zip);
         type(By.xpath("//input[@placeholder='MM / YY']"), expiry);
         type(By.xpath("//input[@placeholder='CVC']"), cvc);
+        // Entering the card number makes the overlay reveal a required
+        // "ZIP Code" field; leaving it empty blocks the payment silently,
+        // with no error message. It can be slow to appear, and the submit
+        // below gets one retry with the ZIP topped up, mirroring what a
+        // human does when the first Pay click only flags the empty field.
+        fillZipWhenRevealed(zip);
+        clickPay();
+        driver.switchTo().defaultContent();
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(10))
+                    .until(ExpectedConditions.urlContains("/confirmation"));
+        } catch (org.openqa.selenium.TimeoutException firstAttempt) {
+            switchToStripeFrame();
+            fillZipWhenRevealed(zip);
+            clickPay();
+            driver.switchTo().defaultContent();
+            new WebDriverWait(driver, TIMEOUT)
+                    .until(ExpectedConditions.urlContains("/confirmation"));
+        }
+        return new ConfirmationPage(driver);
+    }
+
+    private void clickPay() {
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.elementToBeClickable(
                         By.xpath("//button[contains(normalize-space(.), 'Pay')]")))
                 .click();
-        driver.switchTo().defaultContent();
-        new WebDriverWait(driver, TIMEOUT)
-                .until(ExpectedConditions.urlContains("/confirmation"));
-        return new ConfirmationPage(driver);
+    }
+
+    private void fillZipWhenRevealed(String zip) {
+        By zipField = By.xpath("//input[contains(translate(@placeholder, 'zip', 'ZIP'), 'ZIP')"
+                + " or @name='zip' or @id='zip']");
+        try {
+            WebElement field = new WebDriverWait(driver, Duration.ofSeconds(15))
+                    .until(ExpectedConditions.visibilityOfElementLocated(zipField));
+            field.sendKeys(zip);
+            if (!zip.equals(field.getAttribute("value"))) {
+                field.clear();
+                field.sendKeys(zip);
+            }
+        } catch (org.openqa.selenium.TimeoutException notAsked) {
+            // This overlay configuration does not collect a ZIP code.
+        }
     }
 
     private void switchToStripeFrame() {
@@ -130,16 +162,6 @@ public class CartPage {
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.visibilityOfElementLocated(locator))
                 .sendKeys(text);
-    }
-
-    private void typeIfPresent(By locator, String text) {
-        try {
-            new WebDriverWait(driver, Duration.ofSeconds(5))
-                    .until(ExpectedConditions.visibilityOfElementLocated(locator))
-                    .sendKeys(text);
-        } catch (org.openqa.selenium.TimeoutException notAsked) {
-            // The overlay did not ask for this field; nothing to type.
-        }
     }
 
     /**
