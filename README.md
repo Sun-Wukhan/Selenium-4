@@ -162,7 +162,7 @@ and every pull request:
   ([sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/)).
 
 Within a run, the suite itself executes with TestNG `parallel="methods"`
-and three threads (`runner/buy.xml`); `WebManager`'s ThreadLocal drivers
+and two threads (`runner/buy.xml`); `WebManager`'s ThreadLocal drivers
 keep parallel methods in separate browsers. Dependabot watches the Maven,
 GitHub Actions and Docker dependencies weekly.
 

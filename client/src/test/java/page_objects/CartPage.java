@@ -78,15 +78,16 @@ public class CartPage {
      *
      * <p>Clicks the "Pay with Card" button Stripe renders, fills the overlay
      * form (which lives in a Stripe iframe) and submits it. Use Stripe's test
-     * card {@code 4242 4242 4242 4242}, any future expiry, any CVC and any
-     * ZIP. The shop randomly fails about 5% of payments by design; check
+     * card {@code 4242 4242 4242 4242}, any future expiry and any CVC. The
+     * shop randomly fails about 5% of payments by design; check
      * {@link ConfirmationPage#isSuccess()} on the result.
      *
      * @param email      any syntactically valid email address
      * @param cardNumber a Stripe test card number
      * @param expiry     card expiry, {@code MM/YY} or later in the future
      * @param cvc        any three-digit code
-     * @param zip        any ZIP code
+     * @param zip        any ZIP code; the overlay does not currently ask for
+     *                   one, so this is only typed when a ZIP field appears
      * @return the confirmation page the payment submits to
      */
     public ConfirmationPage payWithCard(String email, String cardNumber, String expiry, String cvc, String zip) {
@@ -98,7 +99,7 @@ public class CartPage {
         type(By.xpath("//input[@placeholder='Card number']"), cardNumber);
         type(By.xpath("//input[@placeholder='MM / YY']"), expiry);
         type(By.xpath("//input[@placeholder='CVC']"), cvc);
-        type(By.xpath("//input[@placeholder='ZIP']"), zip);
+        typeIfPresent(By.xpath("//input[@placeholder='ZIP']"), zip);
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.elementToBeClickable(
                         By.xpath("//button[contains(normalize-space(.), 'Pay')]")))
@@ -127,6 +128,16 @@ public class CartPage {
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.visibilityOfElementLocated(locator))
                 .sendKeys(text);
+    }
+
+    private void typeIfPresent(By locator, String text) {
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(3))
+                    .until(ExpectedConditions.visibilityOfElementLocated(locator))
+                    .sendKeys(text);
+        } catch (org.openqa.selenium.TimeoutException notAsked) {
+            // The overlay did not ask for this field; nothing to type.
+        }
     }
 
     /**

@@ -1,7 +1,7 @@
 <!--<?xml version="1.0" encoding="UTF-8" ?>-->
 <!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
 
-<suite thread-count="3" verbose="1" name="Automation" annotations="JDK" parallel="methods" configfailurepolicy="continue">
+<suite thread-count="2" verbose="1" name="Automation" annotations="JDK" parallel="methods" configfailurepolicy="continue">
 
     <test name = "Test Framework">
         <classes>
