@@ -2,19 +2,28 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   test:
-    name: Maven suite (headless Chrome)
+    name: Maven suite (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [ chrome, firefox, edge ]
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -23,36 +32,59 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Run the suite headless
-        run: mvn -B -pl client -am test -Dheadless=true -Dbrowser=chrome
+      - name: Run suite headless
+        run: mvn -B -pl client -am test -Dheadless=true -Dbrowser=${{ matrix.browser }}
 
-      - name: Upload Extent report and Surefire results
+      - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports
+          name: test-reports-${{ matrix.browser }}
           path: |
-            client/target/extent-report/**
-            client/target/surefire-reports/**
-          if-no-files-found: ignore
+            client/target/extent-report
+            client/target/surefire-reports
+          if-no-files-found: warn
 
   docker:
     name: Docker suite
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Build the test image
+      - name: Build image
         run: make docker-build
 
-      - name: Run the suite in Docker
+      - name: Run suite in Docker
         run: make docker-test
 
-      - name: Upload Extent report from the Docker run
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: docker-test-reports
-          path: client/target/extent-report/**
-          if-no-files-found: ignore
+          name: docker-report
+          path: client/target/extent-report
+          if-no-files-found: warn
+
+  report:
+    name: Publish Extent report to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download Chrome run's report
+        uses: actions/download-artifact@v4
+        with:
+          name: test-reports-chrome
+          path: report-site
+
+      - name: Upload Pages site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: report-site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

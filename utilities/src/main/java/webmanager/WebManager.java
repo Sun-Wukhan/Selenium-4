@@ -219,6 +219,8 @@ public class WebManager {
         options.setAcceptInsecureCerts(true);
         options.setPageLoadStrategy(PageLoadStrategy.NORMAL);
         options.addArguments("--window-size=1440,900");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--no-sandbox");
         if (HEADLESS) {
             options.addArguments("--headless=new");
         }

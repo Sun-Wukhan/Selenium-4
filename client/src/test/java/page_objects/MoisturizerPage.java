@@ -2,6 +2,7 @@ package page_objects;
 
 import application_page_actions.NavBot;
 import org.openqa.selenium.By;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -101,6 +102,21 @@ public class MoisturizerPage {
     }
 
     private List<CatalogProduct> products() {
+        // The page's scripts can re-render a card between finding it and
+        // reading its text, which surfaces as a stale element. Re-read the
+        // catalogue once before giving up.
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return readProducts();
+            } catch (StaleElementReferenceException stale) {
+                if (attempt == 2) {
+                    throw stale;
+                }
+            }
+        }
+    }
+
+    private List<CatalogProduct> readProducts() {
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.numberOfElementsToBeMoreThan(PRODUCT_CARD, 0));
         List<CatalogProduct> products = new ArrayList<>();

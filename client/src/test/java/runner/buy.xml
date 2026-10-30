@@ -1,11 +1,15 @@
 <!--<?xml version="1.0" encoding="UTF-8" ?>-->
 <!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
 
-<suite thread-count="1" verbose="1" name="Automation" annotations="JDK" parallel="tests" configfailurepolicy="continue">
+<suite thread-count="2" verbose="1" name="Automation" annotations="JDK" parallel="methods" configfailurepolicy="continue">
 
     <test name = "Test Framework">
         <classes>
             <class name="page_objects_test.PurchaseTest"/>
+            <class name="page_objects_test.SunscreenPurchaseTest"/>
+            <class name="page_objects_test.HomePageTest"/>
+            <class name="page_objects_test.CheckoutTest"/>
+            <class name="page_objects_test.CartEdgeCasesTest"/>
         </classes>
 
     </test>
