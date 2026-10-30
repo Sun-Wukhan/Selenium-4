@@ -79,6 +79,8 @@ jobs:
         with:
           name: test-reports-chrome
           path: report-site
+      - name: Promote report to site root
+        run: cp -r report-site/extent-report/. report-site/
 
       - name: Upload Pages site
         uses: actions/upload-pages-artifact@v3
