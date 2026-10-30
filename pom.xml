@@ -20,7 +20,7 @@
         <testng.version>7.10.2</testng.version>
         <extentreports.version>5.1.2</extentreports.version>
         <poi.version>5.4.0</poi.version>
-        <surefire.version>3.5.2</surefire.version>
+        <surefire.version>3.6.1</surefire.version>
         <commons-lang3.version>3.17.0</commons-lang3.version>
     </properties>
 
