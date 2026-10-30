@@ -1,7 +1,6 @@
 package page_objects_test;
 
 import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import page_objects.CartPage;
 import page_objects.CatalogProduct;
@@ -12,24 +11,20 @@ import java.util.Set;
 
 /**
  * Checks moisturizer prices on the catalog against the cart.
+ *
+ * <p>Page objects are local variables, never fields: TestNG runs this
+ * class's methods in parallel on one shared instance, so a page-object
+ * field would be overwritten by the other method's setup and both methods
+ * would end up driving (and quitting) the same browser.
  */
 public class PurchaseTest extends WebManager {
-
-    private MoisturizerPage moisturizerPage;
-
-    /**
-     * Opens the page object against the browser started by {@link WebManager}.
-     */
-    @BeforeMethod
-    public void openCatalog() {
-        moisturizerPage = new MoisturizerPage(getDriver());
-    }
 
     /**
      * Adds the cheapest moisturizer and checks that the cart line uses the catalog price.
      */
     @Test
     public void catalogPriceMatchesCartLine() {
+        MoisturizerPage moisturizerPage = new MoisturizerPage(getDriver());
         CatalogProduct product = moisturizerPage.cheapest();
         moisturizerPage.add(product);
         WebManager.captureScreenshot("Added " + product.name());
@@ -46,6 +41,7 @@ public class PurchaseTest extends WebManager {
      */
     @Test
     public void cheapestAloeAndAlmondMatchCartTotal() {
+        MoisturizerPage moisturizerPage = new MoisturizerPage(getDriver());
         CatalogProduct aloe = moisturizerPage.cheapestMatching("Aloe");
         CatalogProduct almond = moisturizerPage.cheapestMatching("Almond", Set.of(aloe.name()));
         moisturizerPage.add(aloe);

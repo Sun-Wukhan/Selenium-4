@@ -1,7 +1,6 @@
 package page_objects_test;
 
 import org.testng.Assert;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import page_objects.CartPage;
 import page_objects.CatalogProduct;
@@ -13,18 +12,22 @@ import webmanager.WebManager;
  * Checks sunscreen prices on the catalog against the cart, mirroring
  * {@link PurchaseTest} for the other catalogue. This is the site's sunscreen
  * task: the cheapest SPF-50 and the cheapest SPF-30.
+ *
+ * <p>Page objects are local variables, never fields: TestNG runs this
+ * class's methods in parallel on one shared instance, so a page-object
+ * field would be overwritten by the other method's setup and both methods
+ * would end up driving (and quitting) the same browser.
  */
 public class SunscreenPurchaseTest extends WebManager {
-
-    private SunscreenPage sunscreenPage;
 
     /**
      * Reaches the sunscreen catalogue the way a shopper does: from the home
      * page's "Buy sunscreens" button.
+     *
+     * @return the sunscreen catalogue page for this method's own browser
      */
-    @BeforeMethod
-    public void openCatalog() {
-        sunscreenPage = HomePage.open(getDriver()).buySunscreens();
+    private SunscreenPage openCatalog() {
+        return HomePage.open(getDriver()).buySunscreens();
     }
 
     /**
@@ -33,6 +36,7 @@ public class SunscreenPurchaseTest extends WebManager {
      */
     @Test
     public void cheapestSpf50MatchesCartLine() {
+        SunscreenPage sunscreenPage = openCatalog();
         CatalogProduct product = sunscreenPage.cheapestMatching("SPF-50");
         sunscreenPage.add(product);
 
@@ -48,6 +52,7 @@ public class SunscreenPurchaseTest extends WebManager {
      */
     @Test
     public void cheapestSpf50AndSpf30MatchCartTotal() {
+        SunscreenPage sunscreenPage = openCatalog();
         CatalogProduct spf50 = sunscreenPage.cheapestMatching("SPF-50");
         CatalogProduct spf30 = sunscreenPage.cheapestMatching("SPF-30");
         sunscreenPage.add(spf50);

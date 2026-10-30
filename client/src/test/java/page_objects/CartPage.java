@@ -86,8 +86,8 @@ public class CartPage {
      * @param cardNumber a Stripe test card number
      * @param expiry     card expiry, {@code MM/YY} or later in the future
      * @param cvc        any three-digit code
-     * @param zip        any ZIP code; the overlay does not currently ask for
-     *                   one, so this is only typed when a ZIP field appears
+     * @param zip        any ZIP code; the overlay reveals its ZIP Code field
+     *                   only after the card number is entered, and requires it
      * @return the confirmation page the payment submits to
      */
     public ConfirmationPage payWithCard(String email, String cardNumber, String expiry, String cvc, String zip) {
@@ -97,9 +97,11 @@ public class CartPage {
         switchToStripeFrame();
         type(By.cssSelector("input[type='email']"), email);
         type(By.xpath("//input[@placeholder='Card number']"), cardNumber);
+        // Entering the card number makes the overlay reveal a required
+        // "ZIP Code" field; leaving it empty blocks the payment silently.
+        typeIfPresent(By.xpath("//input[contains(@placeholder, 'ZIP')]"), zip);
         type(By.xpath("//input[@placeholder='MM / YY']"), expiry);
         type(By.xpath("//input[@placeholder='CVC']"), cvc);
-        typeIfPresent(By.xpath("//input[@placeholder='ZIP']"), zip);
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.elementToBeClickable(
                         By.xpath("//button[contains(normalize-space(.), 'Pay')]")))
@@ -132,7 +134,7 @@ public class CartPage {
 
     private void typeIfPresent(By locator, String text) {
         try {
-            new WebDriverWait(driver, Duration.ofSeconds(3))
+            new WebDriverWait(driver, Duration.ofSeconds(5))
                     .until(ExpectedConditions.visibilityOfElementLocated(locator))
                     .sendKeys(text);
         } catch (org.openqa.selenium.TimeoutException notAsked) {
