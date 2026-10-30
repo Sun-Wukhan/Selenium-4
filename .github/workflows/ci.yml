@@ -83,7 +83,7 @@ jobs:
         run: cp -r report-site/extent-report/. report-site/
 
       - name: Upload Pages site
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: report-site
 
