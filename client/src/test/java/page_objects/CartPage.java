@@ -226,17 +226,25 @@ public class CartPage {
     }
 
     private void switchToStripeFrame() {
-        new WebDriverWait(driver, TIMEOUT).until(webDriver ->
-                !webDriver.findElements(By.cssSelector(
-                        "iframe[name='stripe_checkout_app'], iframe.stripe_checkout_app")).isEmpty());
-        for (WebElement frame : driver.findElements(By.tagName("iframe"))) {
-            driver.switchTo().frame(frame);
-            if (!driver.findElements(By.cssSelector("input[type='email']")).isEmpty()) {
-                return;
-            }
+        // The overlay iframe can exist before its document has loaded the
+        // form (Firefox in particular), so scan the frames repeatedly until
+        // one of them actually exposes the email field.
+        try {
+            new WebDriverWait(driver, TIMEOUT).until(webDriver -> {
+                for (WebElement frame : webDriver.findElements(By.tagName("iframe"))) {
+                    webDriver.switchTo().frame(frame);
+                    if (!webDriver.findElements(By.cssSelector("input[type='email']")).isEmpty()) {
+                        return true;
+                    }
+                    webDriver.switchTo().defaultContent();
+                }
+                return false;
+            });
+        } catch (org.openqa.selenium.TimeoutException timeout) {
             driver.switchTo().defaultContent();
+            throw new IllegalStateException(
+                    "Stripe Checkout overlay did not expose an email field", timeout);
         }
-        throw new IllegalStateException("Stripe Checkout overlay did not expose an email field");
     }
 
     private void type(By locator, String text) {
