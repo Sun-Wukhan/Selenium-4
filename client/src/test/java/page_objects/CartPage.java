@@ -96,8 +96,10 @@ public class CartPage {
                 .click();
         switchToStripeFrame();
         type(By.cssSelector("input[type='email']"), email);
-        type(By.xpath("//input[@placeholder='Card number']"), cardNumber);
-        type(By.xpath("//input[@placeholder='MM / YY']"), expiry);
+        typeVerified(By.xpath("//input[@placeholder='Card number']"), cardNumber,
+                cardNumber.replaceAll("(\\d{4})(?=\\d)", "$1 "));
+        typeVerified(By.xpath("//input[@placeholder='MM / YY']"), expiry,
+                expiry.replace("/", " / "));
         type(By.xpath("//input[@placeholder='CVC']"), cvc);
         // Entering the card number makes the overlay reveal a required
         // "ZIP Code" field; leaving it empty blocks the payment silently,
@@ -115,10 +117,46 @@ public class CartPage {
             fillZipWhenRevealed(zip);
             clickPay();
             driver.switchTo().defaultContent();
-            new WebDriverWait(driver, TIMEOUT)
-                    .until(ExpectedConditions.urlContains("/confirmation"));
+            try {
+                new WebDriverWait(driver, TIMEOUT)
+                        .until(ExpectedConditions.urlContains("/confirmation"));
+            } catch (org.openqa.selenium.TimeoutException secondAttempt) {
+                throw new IllegalStateException("Stripe payment never left the cart page. "
+                        + "Overlay state at failure: " + describeOverlay(), secondAttempt);
+            }
         }
         return new ConfirmationPage(driver);
+    }
+
+    /**
+     * Describes every input and button in the Stripe overlay, for diagnosing
+     * a payment that will not submit.
+     *
+     * @return a one-line dump of the overlay's controls and their values
+     */
+    private String describeOverlay() {
+        try {
+            switchToStripeFrame();
+            StringBuilder description = new StringBuilder();
+            for (WebElement input : driver.findElements(By.tagName("input"))) {
+                description.append("[input type=").append(input.getAttribute("type"))
+                        .append(" placeholder=").append(input.getAttribute("placeholder"))
+                        .append(" name=").append(input.getAttribute("name"))
+                        .append(" id=").append(input.getAttribute("id"))
+                        .append(" class=").append(input.getAttribute("class"))
+                        .append(" value='").append(input.getAttribute("value"))
+                        .append("' displayed=").append(input.isDisplayed()).append("] ");
+            }
+            for (WebElement button : driver.findElements(By.tagName("button"))) {
+                description.append("[button text='").append(button.getText())
+                        .append("' displayed=").append(button.isDisplayed())
+                        .append(" enabled=").append(button.isEnabled()).append("] ");
+            }
+            driver.switchTo().defaultContent();
+            return description.toString();
+        } catch (RuntimeException unavailable) {
+            return "unavailable (" + unavailable.getClass().getSimpleName() + ")";
+        }
     }
 
     private void clickPay() {
@@ -205,6 +243,35 @@ public class CartPage {
         new WebDriverWait(driver, TIMEOUT)
                 .until(ExpectedConditions.visibilityOfElementLocated(locator))
                 .sendKeys(text);
+    }
+
+    /**
+     * Types into a field whose widget reformats as you type (card number,
+     * expiry), then checks the field actually holds the formatted value.
+     * The overlay's formatter can drop keystrokes that arrive too fast, so
+     * on a mismatch the value is re-typed one character at a time.
+     *
+     * @param locator       the field to fill
+     * @param text          the raw value to type
+     * @param expectedValue the formatted value the field should end up with
+     */
+    private void typeVerified(By locator, String text, String expectedValue) {
+        WebElement field = new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.visibilityOfElementLocated(locator));
+        field.sendKeys(text);
+        if (expectedValue.equals(field.getAttribute("value"))) {
+            return;
+        }
+        field.clear();
+        for (char character : text.toCharArray()) {
+            field.sendKeys(Character.toString(character));
+            try {
+                Thread.sleep(60);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     /**
