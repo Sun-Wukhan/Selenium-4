@@ -73,7 +73,7 @@ def extract_failures(reports_dir):
 
 def call_anthropic(prompt):
     body = json.dumps({
-        "model": os.environ.get("AI_TRIAGE_MODEL", "claude-sonnet-4-5"),
+        "model": os.environ.get("AI_TRIAGE_MODEL") or "claude-sonnet-4-5",
         "max_tokens": 1500,
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
@@ -93,7 +93,7 @@ def call_anthropic(prompt):
 
 def call_openai(prompt):
     body = json.dumps({
-        "model": os.environ.get("AI_TRIAGE_MODEL", "gpt-4o-mini"),
+        "model": os.environ.get("AI_TRIAGE_MODEL") or "gpt-4o-mini",
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
     request = urllib.request.Request(
