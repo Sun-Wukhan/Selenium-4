@@ -9,6 +9,8 @@
             <class name="page_objects_test.SunscreenPurchaseTest"/>
             <class name="page_objects_test.HomePageTest"/>
             <class name="page_objects_test.CheckoutTest"/>
+            <class name="page_objects_test.CheckoutFailureTest"/>
+            <class name="page_objects_test.DataDrivenPurchaseTest"/>
             <class name="page_objects_test.CartEdgeCasesTest"/>
         </classes>
 
