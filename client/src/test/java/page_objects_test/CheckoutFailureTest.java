@@ -1,23 +1,29 @@
 package page_objects_test;
 
+import org.openqa.selenium.TimeoutException;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import page_objects.CartPage;
 import page_objects.CatalogProduct;
-import page_objects.ConfirmationPage;
 import page_objects.MoisturizerPage;
 import webmanager.WebManager;
 
+import java.time.Duration;
+
 /**
- * The payment failure path, exercised on purpose.
+ * The payment failure paths that can be exercised deterministically.
  *
- * <p>{@link CheckoutTest} proves a good card succeeds; these tests pay with
- * Stripe's deterministic decline cards, which pass the overlay's own checks
- * but are always refused when the shop tries to charge them:
- * {@code 4000 0000 0000 0002} (generic decline) and
- * {@code 4000 0000 0000 9995} (insufficient funds). Unlike the shop's random
- * ~5% failure, a decline card fails every time, so the {@code PAYMENT FAILED}
- * page can be asserted directly with no retry.
+ * <p>The shop's {@code /confirmation} endpoint never charges the card at
+ * all — its source flips a weighted coin ({@code random.uniform(0,1) < 0.95})
+ * and renders success or failure from that, so no card, including Stripe's
+ * decline cards, can force the {@code PAYMENT FAILED} page. What a card
+ * <em>does</em> control deterministically is the Stripe overlay's own
+ * validation: a number that fails the card checksum, or an expiry in the
+ * past, is rejected inside the overlay and the payment is never submitted.
+ * These tests assert exactly that — after submitting bad details the
+ * browser is still on the cart with the overlay open.
  *
  * <p>Page objects are local variables, never fields: TestNG runs this
  * class's methods in parallel on one shared instance.
@@ -25,54 +31,70 @@ import webmanager.WebManager;
 public class CheckoutFailureTest extends WebManager {
 
     private static final String EMAIL = "qa.shopper@example.com";
-    private static final String GENERIC_DECLINE_CARD = "4000000000000002";
-    private static final String INSUFFICIENT_FUNDS_CARD = "4000000000009995";
-    private static final String EXPIRY = "12/34";
+    private static final String GOOD_CARD = "4242424242424242";
+    private static final String BAD_CHECKSUM_CARD = "4242424242424241";
+    private static final String FUTURE_EXPIRY = "12/34";
+    private static final String PAST_EXPIRY = "12/20";
     private static final String CVC = "123";
     private static final String ZIP = "12345";
 
     /**
-     * Pays with the generic decline card and checks the confirmation page
-     * reports a failed payment.
+     * Pays with a card number whose checksum digit is wrong and checks the
+     * overlay rejects it without submitting the payment.
      */
     @Test
-    public void genericallyDeclinedCardShowsPaymentFailed() {
-        ConfirmationPage confirmation = payWithCard(GENERIC_DECLINE_CARD);
+    public void incorrectCardNumberIsRejectedByTheOverlay() {
+        CartPage cart = cartWithCheapestMoisturizer();
 
-        Assert.assertFalse(confirmation.isSuccess(),
-                "a declined card must not report success, page said: " + confirmation.heading());
-        Assert.assertEquals(confirmation.heading(), "PAYMENT FAILED");
+        cart.fillAndSubmitPaymentForm(EMAIL, BAD_CHECKSUM_CARD, FUTURE_EXPIRY, CVC, ZIP);
+
+        assertPaymentNeverSubmitted(cart);
     }
 
     /**
-     * Pays with the insufficient-funds card and checks the confirmation page
-     * reports a failed payment.
+     * Pays with an expiry date in the past and checks the overlay rejects
+     * it without submitting the payment.
      */
     @Test
-    public void insufficientFundsCardShowsPaymentFailed() {
-        ConfirmationPage confirmation = payWithCard(INSUFFICIENT_FUNDS_CARD);
+    public void expiredCardIsRejectedByTheOverlay() {
+        CartPage cart = cartWithCheapestMoisturizer();
 
-        Assert.assertFalse(confirmation.isSuccess(),
-                "an insufficient-funds card must not report success, page said: "
-                        + confirmation.heading());
-        Assert.assertEquals(confirmation.heading(), "PAYMENT FAILED");
+        cart.fillAndSubmitPaymentForm(EMAIL, GOOD_CARD, PAST_EXPIRY, CVC, ZIP);
+
+        assertPaymentNeverSubmitted(cart);
     }
 
     /**
-     * Buys the single cheapest moisturizer and pays for it with the given card.
+     * Builds a cart holding the single cheapest moisturizer.
      *
-     * @param cardNumber the card to pay with
-     * @return the confirmation page the payment lands on
+     * @return the cart page for this method's own browser
      */
-    private ConfirmationPage payWithCard(String cardNumber) {
+    private CartPage cartWithCheapestMoisturizer() {
         MoisturizerPage moisturizerPage = new MoisturizerPage(getDriver());
         CatalogProduct product = moisturizerPage.cheapest();
         moisturizerPage.add(product);
+        return moisturizerPage.openCart();
+    }
 
-        CartPage cart = moisturizerPage.openCart();
-        Assert.assertEquals(cart.total(), product.price(),
-                "cart total should be the single product's price before paying");
-
-        return cart.payWithCard(EMAIL, cardNumber, EXPIRY, CVC, ZIP);
+    /**
+     * Checks that no payment was submitted: the browser never reaches the
+     * confirmation page and the Stripe overlay is still open on the cart.
+     *
+     * @param cart the cart whose payment was just attempted
+     */
+    private void assertPaymentNeverSubmitted(CartPage cart) {
+        boolean navigated;
+        try {
+            new WebDriverWait(getDriver(), Duration.ofSeconds(5))
+                    .until(ExpectedConditions.urlContains("/confirmation"));
+            navigated = true;
+        } catch (TimeoutException expected) {
+            navigated = false;
+        }
+        Assert.assertFalse(navigated,
+                "a payment the overlay rejects must not reach the confirmation page, URL: "
+                        + getDriver().getCurrentUrl());
+        Assert.assertTrue(cart.isStripeOverlayOpen(),
+                "the Stripe overlay should still be open after rejecting the payment");
     }
 }

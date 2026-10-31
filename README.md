@@ -181,9 +181,12 @@ GitHub Actions and Docker dependencies weekly.
 - The shop fails about 5% of payments at random, by design (its
   confirmation page says so). `CheckoutTest` treats a `PAYMENT FAILED`
   result as the designed flake it is and shops + pays once more before
-  failing. The failure side is covered deterministically by
-  `CheckoutFailureTest`, which pays with Stripe's always-declined test
-  cards (`4000 0000 0000 0002`, `4000 0000 0000 9995`).
+  failing. The failure page itself cannot be forced: the shop's
+  `/confirmation` endpoint never charges the card — it renders success or
+  failure from a weighted coin flip — so `CheckoutFailureTest` covers the
+  deterministic failure surface instead, the Stripe overlay's own
+  validation (a card number with a bad checksum, an expiry in the past),
+  which rejects the details and never submits a payment.
 - `DataDrivenPurchaseTest` runs the purchase checks once per row of
   `src/test/resources/data/ingredients.xlsx` (sheets `Ingredients` and
   `Sunscreens`). Commit a sheet at that path to control the data; when

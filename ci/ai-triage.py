@@ -59,7 +59,14 @@ def extract_failures(reports_dir):
         for line in lines:
             if "<<< FAILURE!" in line or "<<< ERROR!" in line:
                 if "-- Time elapsed" in line:  # start of one failed test's block
-                    current = [line.strip()]
+                    header = line.strip()
+                    # The same failure appears once per browser job; keep the
+                    # first occurrence of each failed test.
+                    if any(block[0].split(" -- ")[0] == header.split(" -- ")[0]
+                           for block in excerpts):
+                        current = None
+                        continue
+                    current = [header]
                     excerpts.append(current)
                 continue
             if current is not None:

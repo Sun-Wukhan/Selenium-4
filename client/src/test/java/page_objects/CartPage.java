@@ -91,22 +91,7 @@ public class CartPage {
      * @return the confirmation page the payment submits to
      */
     public ConfirmationPage payWithCard(String email, String cardNumber, String expiry, String cvc, String zip) {
-        new WebDriverWait(driver, TIMEOUT)
-                .until(ExpectedConditions.elementToBeClickable(PAY_BUTTON))
-                .click();
-        switchToStripeFrame();
-        type(By.cssSelector("input[type='email']"), email);
-        typeVerified(By.xpath("//input[@placeholder='Card number']"), cardNumber,
-                cardNumber.replaceAll("(\\d{4})(?=\\d)", "$1 "));
-        typeVerified(By.xpath("//input[@placeholder='MM / YY']"), expiry,
-                expiry.replace("/", " / "));
-        type(By.xpath("//input[@placeholder='CVC']"), cvc);
-        // Entering the card number makes the overlay reveal a required
-        // "ZIP Code" field; leaving it empty blocks the payment silently,
-        // with no error message. It can be slow to appear, and the submit
-        // below gets one retry with the ZIP topped up, mirroring what a
-        // human does when the first Pay click only flags the empty field.
-        fillZipWhenRevealed(zip);
+        fillStripeForm(email, cardNumber, expiry, cvc, zip);
         clickPay();
         driver.switchTo().defaultContent();
         try {
@@ -126,6 +111,58 @@ public class CartPage {
             }
         }
         return new ConfirmationPage(driver);
+    }
+
+    /**
+     * Fills the Stripe overlay and submits it once, without waiting for the
+     * browser to navigate anywhere. For payment details the overlay itself
+     * rejects (a card number that fails its checksum, an expiry in the
+     * past), submission never happens: the overlay stays open on the cart
+     * page, which is what the caller asserts.
+     *
+     * @param email      any syntactically valid email address
+     * @param cardNumber the card number to enter
+     * @param expiry     card expiry, {@code MM/YY}
+     * @param cvc        the CVC to enter
+     * @param zip        the ZIP code to enter when the overlay asks for one
+     */
+    public void fillAndSubmitPaymentForm(String email, String cardNumber, String expiry, String cvc, String zip) {
+        fillStripeForm(email, cardNumber, expiry, cvc, zip);
+        clickPay();
+        driver.switchTo().defaultContent();
+    }
+
+    /**
+     * Returns whether the Stripe Checkout overlay is currently open.
+     *
+     * @return true while the overlay's iframe is present on the page
+     */
+    public boolean isStripeOverlayOpen() {
+        return !driver.findElements(By.cssSelector(
+                "iframe[name='stripe_checkout_app'], iframe.stripe_checkout_app")).isEmpty();
+    }
+
+    /**
+     * Clicks "Pay with Card" and fills every field of the overlay form,
+     * ending inside the overlay's frame ready for {@link #clickPay()}.
+     */
+    private void fillStripeForm(String email, String cardNumber, String expiry, String cvc, String zip) {
+        new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.elementToBeClickable(PAY_BUTTON))
+                .click();
+        switchToStripeFrame();
+        type(By.cssSelector("input[type='email']"), email);
+        typeVerified(By.xpath("//input[@placeholder='Card number']"), cardNumber,
+                cardNumber.replaceAll("(\\d{4})(?=\\d)", "$1 "));
+        typeVerified(By.xpath("//input[@placeholder='MM / YY']"), expiry,
+                expiry.replace("/", " / "));
+        type(By.xpath("//input[@placeholder='CVC']"), cvc);
+        // Entering the card number makes the overlay reveal a required
+        // "ZIP Code" field; leaving it empty blocks the payment silently,
+        // with no error message. It can be slow to appear, and a submit
+        // gets one retry with the ZIP topped up, mirroring what a human
+        // does when the first Pay click only flags the empty field.
+        fillZipWhenRevealed(zip);
     }
 
     /**
