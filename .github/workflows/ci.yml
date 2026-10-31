@@ -90,3 +90,36 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  triage:
+    name: AI failure triage
+    if: failure()
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download test reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-reports-*
+          path: reports
+
+      - name: Run AI triage
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_TRIAGE_MODEL: ${{ vars.AI_TRIAGE_MODEL }}
+        run: python3 ci/ai-triage.py reports ai-triage.md
+
+      - name: Publish triage to run summary
+        if: always()
+        run: cat ai-triage.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload triage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-triage
+          path: ai-triage.md
+          if-no-files-found: warn

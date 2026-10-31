@@ -114,7 +114,7 @@ clicks, `sendKeys`, dropdown selection, cookie save/load, page-load waits.
 | `webmanager.WebManager` | Browser lifecycle, screenshots, Extent hooks | Used by every test |
 | `reporting.TestLogger` / `ExtentManager` / `ExtentTestManager` | Step logging into TestNG + Extent; the shared report session | Used via `WebManager` and `NavBot` |
 | `reporting.FileLogger` / `ApplicationLog` | Plain-text file logging; epic-level log banner | Available |
-| `excelreader.MyDataReader` | Reads an `.xlsx` sheet into `String[][]`, header row skipped — a ready-made TestNG data provider source | Example below |
+| `excelreader.MyDataReader` | Reads an `.xlsx` sheet into `String[][]`, header row skipped — a ready-made TestNG data provider source | Used by `DataDrivenPurchaseTest`; example below |
 | `database_utilities.DBDataProvider` / `DBUtilities` | Runs PostgreSQL queries and returns rows as `String[][]` for a data provider | Example below |
 | `email.SendingEmail` | Simple failure email, email with attachment, HTML email with inline image (Commons Email) | Example below |
 | `screenrecording.MyScreenRecorder` | Records the desktop to `.avi` during a test (Monte) | Example below |
@@ -160,6 +160,13 @@ and every pull request:
 - **report** — on pushes to `master` only, publishes the Chrome run's
   Extent report to GitHub Pages
   ([sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/)).
+- **triage** — runs only when the test job fails. Downloads the Surefire
+  reports and runs `ci/ai-triage.py`, which asks an LLM for a root-cause
+  summary per failure and publishes it to the run's step summary and an
+  `ai-triage` artifact. Enable it by adding an `ANTHROPIC_API_KEY` or
+  `OPENAI_API_KEY` repository secret (optionally `AI_TRIAGE_MODEL` as an
+  Actions variable to pick the model); with no key configured it posts the
+  raw failure excerpts instead, and it never fails the build itself.
 
 Within a run, the suite itself executes with TestNG `parallel="methods"`
 and two threads (`runner/buy.xml`); `WebManager`'s ThreadLocal drivers
@@ -174,7 +181,16 @@ GitHub Actions and Docker dependencies weekly.
 - The shop fails about 5% of payments at random, by design (its
   confirmation page says so). `CheckoutTest` treats a `PAYMENT FAILED`
   result as the designed flake it is and shops + pays once more before
-  failing.
+  failing. The failure page itself cannot be forced: the shop's
+  `/confirmation` endpoint never charges the card — it renders success or
+  failure from a weighted coin flip — so `CheckoutFailureTest` covers the
+  deterministic failure surface instead, the Stripe overlay's own
+  validation (a card number with a bad checksum, an expiry in the past),
+  which rejects the details and never submits a payment.
+- `DataDrivenPurchaseTest` runs the purchase checks once per row of
+  `src/test/resources/data/ingredients.xlsx` (sheets `Ingredients` and
+  `Sunscreens`). Commit a sheet at that path to control the data; when
+  none exists, a sample workbook is seeded on first run.
 - Captures from the original 2023 runs (`.idea/`, `client/recordings/`,
   `client/screenshots/`) were removed from the tree; they remain in the git
   history. Fresh captures are gitignored.
