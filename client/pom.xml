@@ -33,6 +33,11 @@
             <version>1.0-SNAPSHOT</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.deque.html.axe-core</groupId>
+            <artifactId>selenium</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

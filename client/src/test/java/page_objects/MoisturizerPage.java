@@ -2,6 +2,7 @@ package page_objects;
 
 import application_page_actions.NavBot;
 import org.openqa.selenium.By;
+import org.openqa.selenium.Rectangle;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -113,6 +114,30 @@ public class MoisturizerPage {
         NavBot.click(driver.findElement(CART_BUTTON), "Cart");
         new WebDriverWait(driver, TIMEOUT).until(ExpectedConditions.visibilityOfElementLocated(By.id("total")));
         return new CartPage(driver);
+    }
+
+    /**
+     * Returns how many product cards the current catalogue load shows.
+     *
+     * @return number of cards on the page
+     */
+    public int productCount() {
+        return products().size();
+    }
+
+    /**
+     * Returns the on-screen rectangle of every product card, in DOM order.
+     *
+     * @return one rectangle per card
+     */
+    public List<Rectangle> cardRectangles() {
+        new WebDriverWait(driver, TIMEOUT)
+                .until(ExpectedConditions.numberOfElementsToBeMoreThan(PRODUCT_CARD, 0));
+        List<Rectangle> rectangles = new ArrayList<>();
+        for (WebElement card : driver.findElements(PRODUCT_CARD)) {
+            rectangles.add(card.getRect());
+        }
+        return rectangles;
     }
 
     private List<CatalogProduct> products() {

@@ -3,6 +3,10 @@
 
 <suite thread-count="2" verbose="1" name="Automation" annotations="JDK" parallel="methods" configfailurepolicy="continue">
 
+    <listeners>
+        <listener class-name="webmanager.RetryAnnotationTransformer"/>
+    </listeners>
+
     <test name = "Test Framework">
         <classes>
             <class name="page_objects_test.PurchaseTest"/>
@@ -11,6 +15,9 @@
             <class name="page_objects_test.CheckoutTest"/>
             <class name="page_objects_test.CheckoutFailureTest"/>
             <class name="page_objects_test.DataDrivenPurchaseTest"/>
+            <class name="page_objects_test.PropertyPurchaseTest"/>
+            <class name="page_objects_test.AccessibilityTest"/>
+            <class name="page_objects_test.VisualLayoutTest"/>
             <class name="page_objects_test.CartEdgeCasesTest"/>
         </classes>
 
