@@ -87,10 +87,7 @@ public class PropertyPurchaseTest extends WebManager {
     public void randomMoisturizerCartSatisfiesInvariants(List<String> ingredients) {
         String caseName = "moisturizer case " + ingredients + " (seed " + SEED + ")";
         MoisturizerPage page = new MoisturizerPage(getDriver());
-        List<CatalogProduct> chosen = chooseCheapest(page, ingredients);
-        for (CatalogProduct product : chosen) {
-            page.add(product);
-        }
+        List<CatalogProduct> chosen = chooseAndAdd(page, ingredients);
         WebManager.captureScreenshot("Added for " + caseName);
 
         assertCartInvariants(page.openCart(), chosen, caseName);
@@ -106,21 +103,24 @@ public class PropertyPurchaseTest extends WebManager {
     public void randomSunscreenCartSatisfiesInvariants(List<String> filters) {
         String caseName = "sunscreen case " + filters + " (seed " + (SEED + 1) + ")";
         SunscreenPage page = HomePage.open(getDriver()).buySunscreens();
-        List<CatalogProduct> chosen = chooseCheapest(page, filters);
-        for (CatalogProduct product : chosen) {
-            page.add(product);
-        }
+        List<CatalogProduct> chosen = chooseAndAdd(page, filters);
         WebManager.captureScreenshot("Added for " + caseName);
 
         assertCartInvariants(page.openCart(), chosen, caseName);
     }
 
-    private List<CatalogProduct> chooseCheapest(MoisturizerPage page, List<String> filters) {
+    private List<CatalogProduct> chooseAndAdd(MoisturizerPage page, List<String> filters) {
         List<CatalogProduct> chosen = new ArrayList<>();
         Set<String> alreadyChosen = new HashSet<>();
         for (String filter : filters) {
             CatalogProduct product = page.cheapestMatching(filter, alreadyChosen);
             alreadyChosen.add(product.name());
+            // Add before choosing the next filter: that search may reload
+            // the catalogue for a fresh sample, and a reload stales every
+            // element reference from the previous load — including this
+            // product's Add button. The cart survives the reload, so
+            // adding first loses nothing.
+            page.add(product);
             chosen.add(product);
         }
         return chosen;
