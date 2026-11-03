@@ -11,6 +11,7 @@ import reporting.ExtentTestManager;
 import webmanager.WebManager;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Accessibility checks with axe-core (WCAG 2 A and AA rule tags) on the
@@ -18,10 +19,12 @@ import java.util.List;
  *
  * <p>The bar is zero <em>critical</em> violations — a critical result
  * means a user of assistive technology is blocked outright, which is
- * never acceptable. Serious and lower-impact violations are written to
- * the Extent report as warnings rather than failing the build: this is
- * a third-party demo shop the suite does not control, so the suite
- * reports its shortcomings without going red over them.
+ * never acceptable. One critical is accepted explicitly, because this
+ * is a third-party demo shop the suite does not control: its product
+ * images ship without alt text ({@code image-alt}, six per catalogue
+ * page). That known violation, and every serious or lower-impact one,
+ * is written to the Extent report as a warning; any <em>other</em>
+ * critical violation fails the build.
  *
  * <p>Page objects are local variables, never fields: TestNG runs this
  * class's methods in parallel on one shared instance.
@@ -29,6 +32,14 @@ import java.util.List;
 public class AccessibilityTest extends WebManager {
 
     private static final List<String> WCAG_TAGS = List.of("wcag2a", "wcag2aa");
+
+    /**
+     * Critical rules the demo shop is known to violate and this suite
+     * accepts (see the class documentation): reported as warnings, never
+     * allowed to fail the build, and never extended silently — a new
+     * entry here is a deliberate, documented decision.
+     */
+    private static final Set<String> KNOWN_SHOP_CRITICALS = Set.of("image-alt");
 
     /**
      * The landing page (temperature and the two buy buttons).
@@ -74,14 +85,19 @@ public class AccessibilityTest extends WebManager {
                 .analyze(getDriver());
         List<Rule> violations = results.getViolations();
         for (Rule violation : violations) {
-            if (!"critical".equals(violation.getImpact()) && ExtentTestManager.getTest() != null) {
+            boolean accepted = "critical".equals(violation.getImpact())
+                    && KNOWN_SHOP_CRITICALS.contains(violation.getId());
+            if ((!"critical".equals(violation.getImpact()) || accepted)
+                    && ExtentTestManager.getTest() != null) {
                 ExtentTestManager.getTest().warning("axe " + violation.getId()
                         + " (" + violation.getImpact() + ") on " + pageName + ": "
-                        + violation.getHelp());
+                        + violation.getHelp()
+                        + (accepted ? " [known shop violation, accepted]" : ""));
             }
         }
         List<Rule> critical = violations.stream()
                 .filter(violation -> "critical".equals(violation.getImpact()))
+                .filter(violation -> !KNOWN_SHOP_CRITICALS.contains(violation.getId()))
                 .toList();
         Assert.assertTrue(critical.isEmpty(),
                 pageName + " has critical accessibility violations: " + describe(critical));

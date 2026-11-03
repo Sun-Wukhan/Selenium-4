@@ -134,8 +134,10 @@ the framework treats a single failure as weak evidence:
   A failing case reproduces by rerunning with the same seed.
 - **Accessibility** — `AccessibilityTest` runs axe-core (WCAG 2 A/AA)
   on the home, catalogue and cart pages. Critical violations fail the
-  build; lesser ones are warnings in the report, because the shop is a
-  third-party demo this suite does not control.
+  build, with one documented acceptance: the shop's product images
+  ship without alt text (`image-alt`, six per catalogue page), which
+  is reported as a warning instead — the shop is a third-party demo
+  this suite does not control. Lesser violations are warnings too.
 - **Visual checks** — `VisualLayoutTest` checks layout geometry
   (exactly six cards per load, no overlaps, Add buttons inside their
   cards) and that screenshots are real, non-blank renders. Pixel-diff

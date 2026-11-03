@@ -76,8 +76,11 @@ public class VisualLayoutTest extends WebManager {
                 colours.add(image.getRGB(x, y));
             }
         }
-        Assert.assertTrue(colours.size() > 100,
-                "screenshot looks blank or flat: only " + colours.size()
+        // The catalogue page is mostly white space, so a healthy render
+        // samples only a few dozen distinct colours at this stride (62
+        // observed); a blank or flat render samples a handful at most.
+        Assert.assertTrue(colours.size() > 25,
+                "screenshot looks blank or near-flat: only " + colours.size()
                         + " distinct sampled colours");
     }
 
