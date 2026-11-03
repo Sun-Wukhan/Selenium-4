@@ -25,6 +25,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import reporting.ExtentManager;
 import reporting.ExtentTestManager;
+import reporting.FlakeTally;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -110,6 +111,7 @@ public class WebManager {
      */
     @AfterMethod(alwaysRun = true)
     public void afterEachTestMethod(ITestResult result) {
+        FlakeTally.record(result);
         try {
             attachResult(result);
         } finally {
@@ -127,6 +129,7 @@ public class WebManager {
      */
     @AfterSuite(alwaysRun = true)
     public void generateReport() {
+        FlakeTally.publish();
         ExtentManager.flush();
     }
 
@@ -139,7 +142,18 @@ public class WebManager {
             test.assignCategory(group);
         }
         String base64 = screenshotBase64();
-        if (result.getStatus() == ITestResult.FAILURE) {
+        if (result.wasRetried()) {
+            // A failed attempt TestNG is about to rerun. It is neither a
+            // pass nor the settled failure; the final attempt gets its own
+            // entry, and FlakeTally counts this one.
+            String message = "Attempt failed, scheduled for retry: " + result.getThrowable();
+            if (base64 == null) {
+                test.warning(message);
+            } else {
+                test.warning(message,
+                        MediaEntityBuilder.createScreenCaptureFromBase64String(base64).build());
+            }
+        } else if (result.getStatus() == ITestResult.FAILURE) {
             if (base64 == null) {
                 test.fail(result.getThrowable());
             } else {

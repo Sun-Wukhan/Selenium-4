@@ -19,6 +19,7 @@
         <selenium.version>4.51.0</selenium.version>
         <testng.version>7.10.2</testng.version>
         <extentreports.version>5.1.2</extentreports.version>
+        <axe.version>4.10.1</axe.version>
         <poi.version>5.4.0</poi.version>
         <surefire.version>3.5.2</surefire.version>
         <commons-lang3.version>3.17.0</commons-lang3.version>
@@ -40,6 +41,11 @@
                 <groupId>com.aventstack</groupId>
                 <artifactId>extentreports</artifactId>
                 <version>${extentreports.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.deque.html.axe-core</groupId>
+                <artifactId>selenium</artifactId>
+                <version>${axe.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.poi</groupId>
