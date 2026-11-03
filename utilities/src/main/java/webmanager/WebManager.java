@@ -5,6 +5,7 @@ import com.aventstack.extentreports.MediaEntityBuilder;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeDriverService;
@@ -77,13 +78,8 @@ public class WebManager {
      */
     @BeforeMethod
     public void setUp(Method method) {
-        WebDriver webDriver = createDriver();
+        WebDriver webDriver = openCatalogue();
         DRIVERS.set(webDriver);
-        webDriver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
-        if (!HEADLESS) {
-            webDriver.manage().window().maximize();
-        }
-        webDriver.get(URL);
 
         String className = method.getDeclaringClass().getSimpleName();
         ExtentTest test = ExtentTestManager.startTest(method.getName(), className);
@@ -131,6 +127,35 @@ public class WebManager {
     public void generateReport() {
         FlakeTally.publish();
         ExtentManager.flush();
+    }
+
+    /**
+     * Starts a browser and loads the catalogue. A cold renderer can hang
+     * the very first navigation (seen in CI on Edge: "Timed out receiving
+     * message from renderer" for the whole 30-second page-load timeout),
+     * and a {@code @BeforeMethod} failure is a configuration failure that
+     * the retry analyzer cannot rerun — so the launch itself gets one
+     * retry on a fresh browser before the failure is allowed to settle.
+     *
+     * @return a browser already showing the catalogue
+     */
+    private WebDriver openCatalogue() {
+        for (int attempt = 1; ; attempt++) {
+            WebDriver webDriver = createDriver();
+            try {
+                webDriver.manage().timeouts().pageLoadTimeout(PAGE_LOAD_TIMEOUT);
+                if (!HEADLESS) {
+                    webDriver.manage().window().maximize();
+                }
+                webDriver.get(URL);
+                return webDriver;
+            } catch (RuntimeException failure) {
+                webDriver.quit();
+                if (attempt == 2 || !(failure instanceof TimeoutException)) {
+                    throw failure;
+                }
+            }
+        }
     }
 
     private void attachResult(ITestResult result) {
