@@ -1,7 +1,7 @@
 # Headless Chrome image for the moisturizer TestNG suite.
 # Google's Chrome package is amd64. On Apple Silicon, build with:
 #   docker build --platform linux/amd64 -t moisturizer-tests .
-FROM maven:3.9.10-eclipse-temurin-17
+FROM maven:3.9-eclipse-temurin-26
 
 USER root
 
