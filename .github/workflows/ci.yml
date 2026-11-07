@@ -67,7 +67,6 @@ jobs:
     concurrency:
     group: pages
     cancel-in-progress: false
-    
     needs: test
     runs-on: ubuntu-latest
     environment:
