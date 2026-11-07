@@ -4,12 +4,13 @@
 
 A Selenium 4 / TestNG framework in Java 17 that tests the
 [Weather Shopper](https://weathershopper.pythonanywhere.com/) demo shop end
-to end. The live suite (9 tests, run in parallel) covers the home page's
+to end. The live suite (34 test invocations, run in parallel) covers the home page's
 temperature rule (below 19° buy moisturisers, above 34° buy sunscreens),
 both catalogues against the cart — cheapest Aloe + Almond moisturisers,
 cheapest SPF-30 + SPF-50 sunscreens — a full checkout that pays with a
-Stripe test card and verifies the confirmation page, and cart edge cases
-such as the empty cart. The latest Extent report from `master` is published
+Stripe test card and verifies the confirmation page, cart edge cases
+such as the empty cart, seeded property-style generated purchase cases,
+axe-core accessibility checks, and visual layout checks. The latest Extent report from `master` is published
 at [sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/).
 
 Around that suite sits a `utilities` module of reusable framework helpers —
@@ -27,6 +28,7 @@ some of them; the rest are wired up as runnable examples under
 | TestNG | 7.10.2, suite defined in `client/src/test/java/runner/buy.xml` |
 | Build | Maven multi-module (`client` + `utilities`), Surefire 3.5.2 |
 | Reporting | Extent Reports 5.1.2 (Spark HTML) |
+| Accessibility | axe-core 4.10.1 (Deque `axe-core:selenium`) |
 | Data | Apache POI 5.4.0 (Excel), PostgreSQL JDBC 42.7.4 |
 | Extras | Apache Commons Email, Monte Screen Recorder 0.7.7.0 |
 
@@ -60,6 +62,8 @@ Set as Maven system properties (the `Makefile` variables map to them):
 | `url` | `https://weathershopper.pythonanywhere.com/moisturizer` | any catalogue URL |
 | `browser` | `chrome` | `chrome`, `firefox`, `edge` |
 | `headless` | `false` | `true` / `false` |
+| `retry.max` | `1` | extra attempts per failed test before it settles as a failure |
+| `property.seed` | `20261103` | seed for the generated cases in `PropertyPurchaseTest` |
 
 ```bash
 mvn -pl client -am test -Dbrowser=firefox -Dheadless=true
@@ -74,14 +78,14 @@ make test BROWSER=edge URL=https://weathershopper.pythonanywhere.com/sunscreen
 ├── client/                  # the tests
 │   └── src/test/java/
 │       ├── page_objects/        # HomePage, MoisturizerPage, SunscreenPage, CartPage, ConfirmationPage
-│       ├── page_objects_test/   # the live suite: purchase, sunscreen, home, checkout, edge cases
+│       ├── page_objects_test/   # the live suite: purchase, sunscreen, home, checkout, data-driven, property, accessibility, visual, edge cases
 │       ├── application_page_actions/  # NavBot (waits/clicks/cookies), Clank (AWT keys)
 │       ├── examples/            # utility usage examples (below)
 │       └── runner/buy.xml       # TestNG suite file Surefire runs
 ├── utilities/               # the reusable framework module
 │   └── src/main/java/
-│       ├── webmanager/      # WebManager — browser lifecycle + reporting hooks
-│       ├── reporting/       # ExtentManager, ExtentTestManager, TestLogger, FileLogger
+│       ├── webmanager/      # WebManager — browser lifecycle + reporting hooks; RetryAnalyzer + transformer
+│       ├── reporting/       # ExtentManager, ExtentTestManager, FlakeTally, TestLogger, FileLogger
 │       ├── excelreader/     # MyDataReader — .xlsx → String[][]
 │       ├── database_utilities/  # DBUtilities, DBDataProvider — PostgreSQL → String[][]
 │       ├── email/           # SendingEmail — failure mail, attachments, HTML mail
@@ -106,6 +110,39 @@ Every test class extends `WebManager`:
 `NavBot` holds the low-level actions page objects build on — explicit-wait
 clicks, `sendKeys`, dropdown selection, cookie save/load, page-load waits.
 `PurchaseTest` is the template to copy for a new test.
+
+## Retries, flakes and generated cases
+
+The shop is deliberately non-deterministic — it re-randomises its
+catalogue on every load and fails about 5% of payments by design — so
+the framework treats a single failure as weak evidence:
+
+- **Retry analyzer** — a failed test is retried up to `-Dretry.max`
+  times (default 1) before TestNG settles it as a failure.
+  `RetryAnnotationTransformer`, registered in `buy.xml`, applies the
+  analyzer to every `@Test`, so no class declares it.
+- **Flake tally** — retried attempts are not hidden. `FlakeTally`
+  publishes a tally to the Extent report (system info plus its own
+  entry) separating *flaky passes* (green only after a retry — a
+  stability problem) from *hard failures* (still red after every
+  attempt — a bug).
+- **Property-style tests** — `PropertyPurchaseTest` generates its
+  cases from a seed (`-Dproperty.seed`, default `20261103`) instead of
+  hand-picking two: random subsets of moisturiser ingredients and
+  sunscreen ratings, each held to the same invariants (the cart lists
+  exactly what was chosen, at catalogue prices, totalling their sum).
+  A failing case reproduces by rerunning with the same seed.
+- **Accessibility** — `AccessibilityTest` runs axe-core (WCAG 2 A/AA)
+  on the home, catalogue and cart pages. Critical violations fail the
+  build, with one documented acceptance: the shop's product images
+  ship without alt text (`image-alt`, six per catalogue page), which
+  is reported as a warning instead — the shop is a third-party demo
+  this suite does not control. Lesser violations are warnings too.
+- **Visual checks** — `VisualLayoutTest` checks layout geometry
+  (exactly six cards per load, no overlaps, Add buttons inside their
+  cards) and that screenshots are real, non-blank renders. Pixel-diff
+  baselines would flake by design here: the catalogue changes on every
+  load, so no two screenshots ever match.
 
 ## Utilities
 

@@ -54,8 +54,11 @@ public class SunscreenPurchaseTest extends WebManager {
     public void cheapestSpf50AndSpf30MatchCartTotal() {
         SunscreenPage sunscreenPage = openCatalog();
         CatalogProduct spf50 = sunscreenPage.cheapestMatching("SPF-50");
-        CatalogProduct spf30 = sunscreenPage.cheapestMatching("SPF-30");
+        // Add before choosing the next product: its search may reload the
+        // catalogue, which would stale spf50's Add button (the cart itself
+        // survives the reload).
         sunscreenPage.add(spf50);
+        CatalogProduct spf30 = sunscreenPage.cheapestMatching("SPF-30");
         sunscreenPage.add(spf30);
 
         CartPage cart = sunscreenPage.openCart();
