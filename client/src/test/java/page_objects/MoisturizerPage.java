@@ -4,6 +4,7 @@ import application_page_actions.NavBot;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Rectangle;
 import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -95,14 +96,60 @@ public class MoisturizerPage {
     }
 
     /**
-     * Clicks Add and waits until the cart count changes.
+     * Clicks Add and waits until the cart count reaches the expected
+     * total. The catalogue re-renders its cards with scripts, and a click
+     * can land while the button it hit is being replaced — the badge then
+     * never moves even though the click "worked" (seen in CI: the whole
+     * case added cleanly, yet the cart held one product fewer). When the
+     * count does not move, the product is found again on the current page
+     * and clicked once more; only a second miss fails the add.
      *
      * @param product card to add
      */
     public void add(CatalogProduct product) {
-        String before = cartCountText();
+        int expected = cartCount() + 1;
         NavBot.click(product.addButton(), product.name());
-        new WebDriverWait(driver, TIMEOUT).until(webDriver -> !cartCountText().equals(before));
+        if (awaitCartCount(expected)) {
+            return;
+        }
+        CatalogProduct fresh = findByName(product.name());
+        NavBot.click(fresh.addButton(), fresh.name());
+        if (!awaitCartCount(expected)) {
+            throw new IllegalStateException("Cart count did not reach " + expected
+                    + " after adding " + product.name());
+        }
+    }
+
+    private boolean awaitCartCount(int expected) {
+        try {
+            new WebDriverWait(driver, TIMEOUT).until(webDriver -> cartCount() >= expected);
+            return true;
+        } catch (TimeoutException notYet) {
+            return false;
+        }
+    }
+
+    private CatalogProduct findByName(String name) {
+        for (int load = 1; ; load++) {
+            var match = products().stream()
+                    .filter(product -> product.name().equals(name))
+                    .findFirst();
+            if (match.isPresent()) {
+                return match.get();
+            }
+            if (load == MAX_CATALOGUE_LOADS) {
+                throw new IllegalStateException("No product named " + name
+                        + " after " + MAX_CATALOGUE_LOADS + " catalogue loads");
+            }
+            driver.navigate().refresh();
+        }
+    }
+
+    private int cartCount() {
+        // The badge reads "Cart: 2 items"; before the page's scripts run
+        // it can carry no number at all, which counts as zero.
+        Matcher matcher = PRICE_DIGITS.matcher(cartCountText());
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 
     /**
