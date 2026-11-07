@@ -10,10 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   test:
     name: Maven suite (${{ matrix.browser }})
@@ -68,6 +64,10 @@ jobs:
   report:
     name: Publish Extent report to GitHub Pages
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    concurrency:
+    group: pages
+    cancel-in-progress: false
+    
     needs: test
     runs-on: ubuntu-latest
     environment:
