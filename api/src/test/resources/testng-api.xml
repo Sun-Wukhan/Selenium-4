@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Weather Shopper API">
+    <test name="Backend contract tests">
+        <classes>
+            <class name="api.tests.HomeApiTest"/>
+            <class name="api.tests.CatalogApiTest"/>
+            <class name="api.tests.CartApiTest"/>
+            <class name="api.tests.ConfirmationApiTest"/>
+            <class name="api.tests.RoutingApiTest"/>
+        </classes>
+    </test>
+</suite>
