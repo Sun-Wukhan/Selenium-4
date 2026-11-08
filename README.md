@@ -82,6 +82,43 @@ mvn -pl client -am test -Dbrowser=firefox -Dheadless=true
 make test BROWSER=edge URL=https://weathershopper.pythonanywhere.com/sunscreen
 ```
 
+## API tests
+
+The `api` module tests the shop's backend directly over HTTP with REST
+Assured — no browser — so a failure says whether the shop or the UI
+layer broke. The shop is server-rendered (pages and form posts, no
+JSON), and the tests pin the contracts the UI suite silently depends on:
+
+| Test class | Contract |
+| --- | --- |
+| `HomeApiTest` | Home page served as HTML; the temperature script carries both decisive bands (1–18, 35–49) |
+| `CatalogApiTest` | Each catalogue page is exactly 6 products sampled from the canonical pool at pool prices; moisturizer pages always offer both Aloe and Almond; sunscreen names carry their SPF rating |
+| `CartApiTest` | The cart lists the submitted items and totals them — including that it totals the *posted* prices |
+| `ConfirmationApiTest` | Every confirmation renders exactly one outcome; at least 30 of 40 succeed (the designed rate is 95%, so the bound cannot flake) |
+| `RoutingApiTest` | `/about` serves; unknown paths are 404; catalogues reject POST and `/confirmation` rejects GET (405) |
+
+Run it against a locally hosted shop (see Quick start), or point it at
+any deployment with `-Dshop.baseUrl`:
+
+```bash
+mvn -pl api test
+mvn -pl api test -Dshop.baseUrl=https://weathershopper.pythonanywhere.com
+```
+
+Example run, captured from CI (the "API suite (REST Assured)" job):
+
+```text
+$ mvn -B -pl api test
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.662 s -- in TestSuite
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  4.675 s
+```
+
+The whole backend contract executes in under two seconds of test time —
+against the same shop instance the browser suite is testing, in the
+same CI run.
+
 ## Project structure
 
 ```
