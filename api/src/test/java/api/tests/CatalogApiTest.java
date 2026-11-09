@@ -23,7 +23,7 @@ public class CatalogApiTest {
 
     private final ShopClient shop = new ShopClient();
 
-    @Test
+    @Test(description = "GET /moisturizer shows exactly 6 products sampled from the canonical pool at canonical prices, with no duplicates")
     public void moisturizerPageIsAPoolSample() {
         Response response = shop.moisturizers();
         Assert.assertEquals(response.statusCode(), 200);
@@ -31,7 +31,7 @@ public class CatalogApiTest {
         assertPoolSample(products, ShopCatalog.MOISTURIZERS, "moisturizer");
     }
 
-    @Test
+    @Test(description = "Every moisturizer sample offers at least one Aloe and one Almond product, so a purchase is always possible")
     public void moisturizerPageAlwaysOffersBothIngredients() {
         List<Product> products = CatalogPageParser.parse(shop.moisturizers().body().asString());
         // The pool is five Aloe and five Almond; a six-product sample
@@ -43,7 +43,7 @@ public class CatalogApiTest {
                 "moisturizer page should always include an Almond product");
     }
 
-    @Test
+    @Test(description = "GET /sunscreen shows exactly 6 products sampled from the canonical pool at canonical prices, with no duplicates")
     public void sunscreenPageIsAPoolSample() {
         Response response = shop.sunscreens();
         Assert.assertEquals(response.statusCode(), 200);
@@ -51,7 +51,7 @@ public class CatalogApiTest {
         assertPoolSample(products, ShopCatalog.SUNSCREENS, "sunscreen");
     }
 
-    @Test
+    @Test(description = "Every sunscreen product name carries its SPF rating")
     public void sunscreenPageNamesCarryTheirRating() {
         List<Product> products = CatalogPageParser.parse(shop.sunscreens().body().asString());
         for (Product product : products) {

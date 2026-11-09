@@ -70,7 +70,11 @@ public final class LoadHarness {
                     int status;
                     try {
                         status = call.getAsInt();
-                    } catch (RuntimeException failure) {
+                    } catch (Throwable failure) {
+                        // REST Assured sneaky-throws checked IOExceptions
+                        // (connection refused, resets) past its RuntimeException
+                        // signatures; a transport failure is an error sample,
+                        // never a reason to drop the call from the statistics.
                         status = -1;
                     }
                     latenciesNanos.add(System.nanoTime() - started);

@@ -119,6 +119,14 @@ The whole backend contract executes in under two seconds of test time —
 against the same shop instance the browser suite is testing, in the
 same CI run.
 
+Every run also produces an HTML report in the same style as the
+browser suite's: `api/target/api-report/index.html` lists each test
+with its description, outcome and duration, plus the HTTP exchanges it
+made — method, path, status, elapsed time and a response excerpt —
+captured by a REST Assured filter (`api.reporting`). On pushes to
+`master` it is published alongside the UI report at
+[sun-wukhan.github.io/Selenium-4/api](https://sun-wukhan.github.io/Selenium-4/api/).
+
 ### Performance tests
 
 The `api` module also carries a Java performance layer (package
@@ -144,6 +152,11 @@ CI against the self-hosted shop (PR #18, November 2026):
 | GET /sunscreen | 216 | 0 | 26 ms | 34 ms | 40 ms | 392 req/s |
 | POST /cart | 216 | 0 | 26 ms | 37 ms | 43 ms | 382 req/s |
 | Mixed workload (70/20/10) | 276 | 0 | 23 ms | 29 ms | 42 ms | 475 req/s |
+
+The same numbers are rendered as a styled page at
+`api/target/perf-report.html` — summary cards, per-workload latency
+detail and p95-versus-budget bars — published on `master` pushes at
+[sun-wukhan.github.io/Selenium-4/perf](https://sun-wukhan.github.io/Selenium-4/perf/).
 
 ## Project structure
 
@@ -174,6 +187,7 @@ CI against the self-hosted shop (PR #18, November 2026):
 │       │   ├── model/       # Product
 │       │   ├── parsing/     # CatalogPageParser — jsoup, same selectors as the page objects
 │       │   ├── perf/        # LoadHarness, budgets, perf tests (perf profile only)
+│       │   ├── reporting/   # ExchangeCapture filter + Extent report listener
 │       │   └── tests/       # Home, Catalog, Cart, Confirmation, Routing contract tests
 │       └── resources/       # testng-api.xml (contract) and testng-perf.xml (performance)
 ├── Dockerfile               # Maven + Chrome image that runs the suite headless
@@ -291,9 +305,10 @@ and every pull request:
   also accepts manual runs (`workflow_dispatch`) for on-demand checks.
 - **docker** — builds the `Dockerfile` image and runs the suite inside it
   (`make docker-test`); this job still targets the live demo site.
-- **report** — on pushes to `master` only, publishes the Chrome run's
-  Extent report to GitHub Pages
-  ([sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/)).
+- **report** — on pushes to `master` only, publishes all three reports
+  to GitHub Pages: the Chrome run's Extent report at
+  [sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/),
+  the API report at `/api/`, and the performance report at `/perf/`.
 - **triage** — runs only when the test job fails. Downloads the Surefire
   reports and runs `ci/ai-triage.py`, which asks an LLM for a root-cause
   summary per failure and publishes it to the run's step summary and an
