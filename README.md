@@ -119,6 +119,32 @@ The whole backend contract executes in under two seconds of test time —
 against the same shop instance the browser suite is testing, in the
 same CI run.
 
+### Performance tests
+
+The `api` module also carries a Java performance layer (package
+`api.perf`): a small dependency-free load harness drives the endpoints
+concurrently (12 threads, warm-up excluded) and reports mean, p50, p95,
+p99 and max latency plus throughput per workload. Each test asserts
+zero errors and a p95 under its budget (750 ms by default) — the budgets
+are regression tripwires, not load-test heroics, and every value is
+overridable (`-Dperf.threads`, `-Dperf.requests`, `-Dperf.p95.*`). The
+suite lives behind the `perf` Maven profile so ordinary builds and PR
+gates run only the deterministic contract tests:
+
+```bash
+mvn -pl api test -Pperf   # shop must be running, as above
+```
+
+Every run appends its table to `api/target/perf-report.md`. Measured in
+CI against the self-hosted shop (PR #18, November 2026):
+
+| Workload | Requests | Errors | Mean | p95 | p99 | Throughput |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| GET /moisturizer | 216 | 0 | 27 ms | 41 ms | 45 ms | 114 req/s |
+| GET /sunscreen | 216 | 0 | 26 ms | 34 ms | 40 ms | 392 req/s |
+| POST /cart | 216 | 0 | 26 ms | 37 ms | 43 ms | 382 req/s |
+| Mixed workload (70/20/10) | 276 | 0 | 23 ms | 29 ms | 42 ms | 475 req/s |
+
 ## Project structure
 
 ```
@@ -147,8 +173,9 @@ same CI run.
 │       │   ├── data/        # ShopCatalog — the shop's canonical product pools
 │       │   ├── model/       # Product
 │       │   ├── parsing/     # CatalogPageParser — jsoup, same selectors as the page objects
+│       │   ├── perf/        # LoadHarness, budgets, perf tests (perf profile only)
 │       │   └── tests/       # Home, Catalog, Cart, Confirmation, Routing contract tests
-│       └── resources/testng-api.xml   # TestNG suite file Surefire runs
+│       └── resources/       # testng-api.xml (contract) and testng-perf.xml (performance)
 ├── Dockerfile               # Maven + Chrome image that runs the suite headless
 └── Makefile                 # test / docker / report targets
 ```
@@ -258,6 +285,10 @@ and every pull request:
   contract suite (`mvn -pl api test`): catalogue sampling invariants,
   cart totals, the confirmation coin-flip contract, routing and status
   codes — the backend half the browser cannot see.
+- **perf** — starts the same self-hosted shop and runs the performance
+  suite (`mvn -pl api test -Pperf`), publishing the generated
+  `perf-report.md` to the run summary and as an artifact. The workflow
+  also accepts manual runs (`workflow_dispatch`) for on-demand checks.
 - **docker** — builds the `Dockerfile` image and runs the suite inside it
   (`make docker-test`); this job still targets the live demo site.
 - **report** — on pushes to `master` only, publishes the Chrome run's

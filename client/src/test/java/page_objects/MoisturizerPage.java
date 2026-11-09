@@ -13,6 +13,7 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -33,6 +34,7 @@ public class MoisturizerPage {
     private static final Pattern PRICE_DIGITS = Pattern.compile("(\\d+)");
     private static final Duration TIMEOUT = Duration.ofSeconds(15);
     private static final int MAX_CATALOGUE_LOADS = 6;
+    private static final int MAX_JOINT_LOADS = 25;
 
     private final WebDriver driver;
 
@@ -77,8 +79,11 @@ public class MoisturizerPage {
         String needle = ingredient.toLowerCase(Locale.ROOT);
         // The shop re-randomises its catalogue on every page load, so a given
         // load may contain no matching product at all (seen in CI: a sunscreen
-        // load with no SPF-50). Reload for a fresh catalogue before giving up;
-        // the session cart survives the refresh.
+        // load with no SPF-50). Reload for a fresh catalogue before giving up.
+        // Note the shop keeps its cart in page memory, so a reload also wipes
+        // the cart: callers adding several products must pick them all from a
+        // single load first (see cheapestMatchingAll) instead of reloading
+        // between adds.
         for (int load = 1; ; load++) {
             var match = products().stream()
                     .filter(product -> product.name().toLowerCase(Locale.ROOT).contains(needle))
@@ -90,6 +95,48 @@ public class MoisturizerPage {
             if (load == MAX_CATALOGUE_LOADS) {
                 throw new IllegalStateException("No moisturizer matching " + ingredient
                         + " after " + MAX_CATALOGUE_LOADS + " catalogue loads");
+            }
+            driver.navigate().refresh();
+        }
+    }
+
+    /**
+     * Returns the cheapest product for each filter, all picked from ONE
+     * catalogue load. The shop keeps its cart in page memory, so a refresh
+     * wipes it: choosing one product, adding it, then reloading to choose
+     * the next silently loses the first (seen in CI on Edge: the sunscreen
+     * case [SPF-30, SPF-40] ended with one product in the cart). Picking
+     * every product from a single load first, then adding them all, keeps
+     * the cart intact; loads repeat until one load satisfies every filter.
+     *
+     * @param filters words to match, such as Aloe and Almond
+     * @return one cheapest product per filter, in filter order
+     */
+    public List<CatalogProduct> cheapestMatchingAll(List<String> filters) {
+        for (int load = 1; ; load++) {
+            List<CatalogProduct> sample = products();
+            List<CatalogProduct> picks = new ArrayList<>();
+            Set<String> usedNames = new HashSet<>();
+            boolean allMatched = true;
+            for (String filter : filters) {
+                String needle = filter.toLowerCase(Locale.ROOT);
+                var match = sample.stream()
+                        .filter(product -> product.name().toLowerCase(Locale.ROOT).contains(needle))
+                        .filter(product -> !usedNames.contains(product.name()))
+                        .min(Comparator.comparingInt(CatalogProduct::price));
+                if (match.isEmpty()) {
+                    allMatched = false;
+                    break;
+                }
+                picks.add(match.get());
+                usedNames.add(match.get().name());
+            }
+            if (allMatched) {
+                return picks;
+            }
+            if (load == MAX_JOINT_LOADS) {
+                throw new IllegalStateException("No single catalogue load matched all of "
+                        + filters + " after " + MAX_JOINT_LOADS + " loads");
             }
             driver.navigate().refresh();
         }

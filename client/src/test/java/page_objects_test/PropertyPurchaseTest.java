@@ -110,18 +110,14 @@ public class PropertyPurchaseTest extends WebManager {
     }
 
     private List<CatalogProduct> chooseAndAdd(MoisturizerPage page, List<String> filters) {
-        List<CatalogProduct> chosen = new ArrayList<>();
-        Set<String> alreadyChosen = new HashSet<>();
-        for (String filter : filters) {
-            CatalogProduct product = page.cheapestMatching(filter, alreadyChosen);
-            alreadyChosen.add(product.name());
-            // Add before choosing the next filter: that search may reload
-            // the catalogue for a fresh sample, and a reload stales every
-            // element reference from the previous load — including this
-            // product's Add button. The cart survives the reload, so
-            // adding first loses nothing.
+        // Pick every product from a single catalogue load first, then add
+        // them all from that same load: the shop keeps its cart in page
+        // memory, so a reload while choosing the next filter would wipe
+        // whatever was already added, and element references from the
+        // chosen load stay fresh because nothing reloads between the adds.
+        List<CatalogProduct> chosen = page.cheapestMatchingAll(filters);
+        for (CatalogProduct product : chosen) {
             page.add(product);
-            chosen.add(product);
         }
         return chosen;
     }
