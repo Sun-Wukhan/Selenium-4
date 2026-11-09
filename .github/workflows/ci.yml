@@ -28,8 +28,25 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Check out the shop under test
+        uses: actions/checkout@v7
+        with:
+          repository: qxf2/weather-shopper
+          path: weather-shopper
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Start the shop
+        run: |
+          pip install flask
+          nohup python weather-shopper/weather_shopper.py > shop.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:6464/ && break || sleep 1; done
+
       - name: Run suite headless
-        run: mvn -B -pl client -am test -Dheadless=true -Dbrowser=${{ matrix.browser }}
+        run: mvn -B -pl client -am test -Dheadless=true -Dbrowser=${{ matrix.browser }} -Durl=http://127.0.0.1:6464/moisturizer
 
       - name: Upload reports
         if: always()
@@ -59,6 +76,47 @@ jobs:
         with:
           name: docker-report
           path: client/target/extent-report
+          if-no-files-found: warn
+
+  api:
+    name: API suite (REST Assured)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out the shop under test
+        uses: actions/checkout@v7
+        with:
+          repository: qxf2/weather-shopper
+          path: weather-shopper
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Start the shop
+        run: |
+          pip install flask
+          nohup python weather-shopper/weather_shopper.py > shop.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:6464/ && break || sleep 1; done
+
+      - name: Run API suite
+        run: mvn -B -pl api test
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-reports
+          path: api/target/surefire-reports
           if-no-files-found: warn
 
   report:

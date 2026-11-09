@@ -26,10 +26,11 @@ some of them; the rest are wired up as runnable examples under
 | Java | 17 |
 | Selenium | 4.51.0, drivers and browsers resolved by Selenium Manager — no manual driver downloads |
 | TestNG | 7.10.2, suite defined in `client/src/test/java/runner/buy.xml` |
-| Build | Maven multi-module (`client` + `utilities`), Surefire 3.5.2 |
+| Build | Maven multi-module (`client` + `utilities` + `api`), Surefire 3.5.2 |
+| API testing | REST Assured 5.5.7 + jsoup, TestNG suite in `api/src/test/resources/testng-api.xml` |
 | Reporting | Extent Reports 5.1.2 (Spark HTML) |
 | Accessibility | axe-core 4.10.1 (Deque `axe-core:selenium`) |
-| Data | Apache POI 5.4.0 (Excel), PostgreSQL JDBC 42.7.4 |
+| Data | Apache POI 6.0.0 (Excel), PostgreSQL JDBC 42.7.14 |
 | Extras | Apache Commons Email, Monte Screen Recorder 0.7.7.0 |
 
 ## Quick start
@@ -50,6 +51,16 @@ The plain Maven equivalent:
 mvn -pl client -am test -Dheadless=true -Dbrowser=chrome
 ```
 
+The API suite needs the shop itself. Run the shop locally (it is the
+open-source [qxf2/weather-shopper](https://github.com/qxf2/weather-shopper)
+Flask app, port 6464), then the contract tests:
+
+```bash
+git clone https://github.com/qxf2/weather-shopper && cd weather-shopper
+python3 -m venv .venv && .venv/bin/pip install flask && .venv/bin/python weather_shopper.py &
+mvn -pl api test   # 17 contract tests against http://127.0.0.1:6464
+```
+
 The report lands at `client/target/extent-report/index.html`, with a
 pass/fail screenshot attached to every test.
 
@@ -64,11 +75,49 @@ Set as Maven system properties (the `Makefile` variables map to them):
 | `headless` | `false` | `true` / `false` |
 | `retry.max` | `1` | extra attempts per failed test before it settles as a failure |
 | `property.seed` | `20261103` | seed for the generated cases in `PropertyPurchaseTest` |
+| `shop.baseUrl` | `http://127.0.0.1:6464` | base URL of the shop the API suite tests (`api` module) |
 
 ```bash
 mvn -pl client -am test -Dbrowser=firefox -Dheadless=true
 make test BROWSER=edge URL=https://weathershopper.pythonanywhere.com/sunscreen
 ```
+
+## API tests
+
+The `api` module tests the shop's backend directly over HTTP with REST
+Assured — no browser — so a failure says whether the shop or the UI
+layer broke. The shop is server-rendered (pages and form posts, no
+JSON), and the tests pin the contracts the UI suite silently depends on:
+
+| Test class | Contract |
+| --- | --- |
+| `HomeApiTest` | Home page served as HTML; the temperature script carries both decisive bands (1–18, 35–49) |
+| `CatalogApiTest` | Each catalogue page is exactly 6 products sampled from the canonical pool at pool prices; moisturizer pages always offer both Aloe and Almond; sunscreen names carry their SPF rating |
+| `CartApiTest` | The cart lists the submitted items and totals them — including that it totals the *posted* prices |
+| `ConfirmationApiTest` | Every confirmation renders exactly one outcome; at least 30 of 40 succeed (the designed rate is 95%, so the bound cannot flake) |
+| `RoutingApiTest` | `/about` serves; unknown paths are 404; catalogues reject POST and `/confirmation` rejects GET (405) |
+
+Run it against a locally hosted shop (see Quick start), or point it at
+any deployment with `-Dshop.baseUrl`:
+
+```bash
+mvn -pl api test
+mvn -pl api test -Dshop.baseUrl=https://weathershopper.pythonanywhere.com
+```
+
+Example run, captured from CI (the "API suite (REST Assured)" job):
+
+```text
+$ mvn -B -pl api test
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.662 s -- in TestSuite
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  4.675 s
+```
+
+The whole backend contract executes in under two seconds of test time —
+against the same shop instance the browser suite is testing, in the
+same CI run.
 
 ## Project structure
 
@@ -90,6 +139,16 @@ make test BROWSER=edge URL=https://weathershopper.pythonanywhere.com/sunscreen
 │       ├── database_utilities/  # DBUtilities, DBDataProvider — PostgreSQL → String[][]
 │       ├── email/           # SendingEmail — failure mail, attachments, HTML mail
 │       └── screenrecording/ # MyScreenRecorder — Monte .avi capture
+├── api/                     # the backend contract suite (REST Assured)
+│   └── src/test/
+│       ├── java/api/
+│       │   ├── config/      # ApiConfig — shop base URL + endpoint paths
+│       │   ├── client/      # ShopClient — the REST Assured calls
+│       │   ├── data/        # ShopCatalog — the shop's canonical product pools
+│       │   ├── model/       # Product
+│       │   ├── parsing/     # CatalogPageParser — jsoup, same selectors as the page objects
+│       │   └── tests/       # Home, Catalog, Cart, Confirmation, Routing contract tests
+│       └── resources/testng-api.xml   # TestNG suite file Surefire runs
 ├── Dockerfile               # Maven + Chrome image that runs the suite headless
 └── Makefile                 # test / docker / report targets
 ```
@@ -191,9 +250,16 @@ and every pull request:
 - **test** — JDK 17 on Ubuntu, a browser matrix (Chrome, Firefox, Edge,
   all headless) running the suite exactly as `make test-headless` does, and
   uploading the Extent report and Surefire results as an artifact per
-  browser, pass or fail.
+  browser, pass or fail. The job first starts a self-hosted copy of the
+  shop (checked out from qxf2/weather-shopper) and points the suite at it
+  with `-Durl=http://127.0.0.1:6464/moisturizer`, so CI no longer depends
+  on the public demo site's uptime or latency.
+- **api** — starts the same self-hosted shop and runs the REST Assured
+  contract suite (`mvn -pl api test`): catalogue sampling invariants,
+  cart totals, the confirmation coin-flip contract, routing and status
+  codes — the backend half the browser cannot see.
 - **docker** — builds the `Dockerfile` image and runs the suite inside it
-  (`make docker-test`).
+  (`make docker-test`); this job still targets the live demo site.
 - **report** — on pushes to `master` only, publishes the Chrome run's
   Extent report to GitHub Pages
   ([sun-wukhan.github.io/Selenium-4](https://sun-wukhan.github.io/Selenium-4/)).
@@ -212,9 +278,10 @@ GitHub Actions and Docker dependencies weekly.
 
 ## Notes
 
-- The suite tests a live third-party demo site; a red build can mean the
-  site changed or is down, not that the framework broke. Check the Extent
-  artifact's screenshots first.
+- In CI the suites run against a self-hosted copy of the shop, so a red
+  build there is a real signal. Local UI runs still default to the live
+  demo site (pass `-Durl` to change that); a red local run can mean the
+  site changed or is down. Check the Extent artifact's screenshots first.
 - The shop fails about 5% of payments at random, by design (its
   confirmation page says so). `CheckoutTest` treats a `PAYMENT FAILED`
   result as the designed flake it is and shops + pays once more before

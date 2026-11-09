@@ -36,6 +36,7 @@ WORKDIR /app
 COPY pom.xml ./
 COPY client/pom.xml client/pom.xml
 COPY utilities/pom.xml utilities/pom.xml
+COPY api/pom.xml api/pom.xml
 COPY client/src client/src
 COPY utilities/src utilities/src
 
