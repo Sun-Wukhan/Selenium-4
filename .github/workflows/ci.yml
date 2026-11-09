@@ -117,7 +117,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api-reports
-          path: api/target/surefire-reports
+          path: |
+            api/target/surefire-reports
+            api/target/api-report
           if-no-files-found: warn
 
   perf:
@@ -164,6 +166,7 @@ jobs:
           name: perf-report
           path: |
             api/target/perf-report.md
+            api/target/perf-report.html
             api/target/surefire-reports
           if-no-files-found: warn
 
@@ -173,7 +176,7 @@ jobs:
     concurrency:
       group: pages
       cancel-in-progress: false
-    needs: test
+    needs: [ test, api, perf ]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -186,6 +189,24 @@ jobs:
           path: report-site
       - name: Promote report to site root
         run: cp -r report-site/extent-report/. report-site/
+
+      - name: Download API report
+        uses: actions/download-artifact@v8
+        with:
+          name: api-reports
+          path: api-artifact
+
+      - name: Download performance report
+        uses: actions/download-artifact@v8
+        with:
+          name: perf-report
+          path: perf-artifact
+
+      - name: Add API and performance reports to the site
+        run: |
+          mkdir -p report-site/api report-site/perf
+          cp api-artifact/api-report/index.html report-site/api/index.html
+          cp perf-artifact/perf-report.html report-site/perf/index.html
 
       - name: Upload Pages site
         uses: actions/upload-pages-artifact@v5
