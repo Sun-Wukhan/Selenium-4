@@ -2,6 +2,7 @@ package api.client;
 
 import api.config.ApiConfig;
 import api.model.Product;
+import api.reporting.ExchangeCapture;
 import io.restassured.response.Response;
 
 import java.util.List;
@@ -33,11 +34,11 @@ public class ShopClient {
     }
 
     public Response get(String path) {
-        return given().baseUri(ApiConfig.BASE_URL).when().get(path);
+        return given().baseUri(ApiConfig.BASE_URL).filter(ExchangeCapture.INSTANCE).when().get(path);
     }
 
     public Response post(String path) {
-        return given().baseUri(ApiConfig.BASE_URL).when().post(path);
+        return given().baseUri(ApiConfig.BASE_URL).filter(ExchangeCapture.INSTANCE).when().post(path);
     }
 
     /**
@@ -49,7 +50,7 @@ public class ShopClient {
      * @return the rendered cart page response
      */
     public Response submitCart(List<Product> items) {
-        var request = given().baseUri(ApiConfig.BASE_URL)
+        var request = given().baseUri(ApiConfig.BASE_URL).filter(ExchangeCapture.INSTANCE)
                 .contentType("application/x-www-form-urlencoded");
         for (Product item : items) {
             request.formParam(item.name(), item.price());

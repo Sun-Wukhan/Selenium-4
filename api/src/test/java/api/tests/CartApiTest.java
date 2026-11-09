@@ -17,7 +17,7 @@ public class CartApiTest {
 
     private final ShopClient shop = new ShopClient();
 
-    @Test
+    @Test(description = "POST /cart lists the submitted items and totals their prices (128 + 199 = 327)")
     public void cartListsSubmittedItemsAndTotalsThem() {
         List<Product> items = List.of(
                 new Product("Boris Almond and Honey", 128),
@@ -31,7 +31,7 @@ public class CartApiTest {
                 "cart total should be the sum of the submitted prices");
     }
 
-    @Test
+    @Test(description = "The cart total trusts the submitted price, not the catalogue pool price")
     public void cartTotalIsTheSubmittedPriceNotThePoolPrice() {
         // The endpoint trusts the posted prices (the browser posts the
         // catalogue price it rendered). Pin that behaviour: a drift
@@ -40,7 +40,7 @@ public class CartApiTest {
         Assert.assertEquals(CatalogPageParser.parseCartTotal(response.body().asString()), 1);
     }
 
-    @Test
+    @Test(description = "An empty cart submission totals 0")
     public void emptyCartTotalsZero() {
         Response response = shop.submitCart(List.of());
         Assert.assertEquals(response.statusCode(), 200);
@@ -48,7 +48,7 @@ public class CartApiTest {
         Assert.assertTrue(CatalogPageParser.parseCartItems(response.body().asString()).isEmpty());
     }
 
-    @Test
+    @Test(description = "GET /cart loads with 200 even without a prior submission")
     public void cartPageLoadsWithoutSubmission() {
         Response response = shop.get("/cart");
         Assert.assertEquals(response.statusCode(), 200);

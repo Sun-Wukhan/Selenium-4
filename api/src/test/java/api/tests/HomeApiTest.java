@@ -16,7 +16,7 @@ public class HomeApiTest {
 
     private final ShopClient shop = new ShopClient();
 
-    @Test
+    @Test(description = "GET / returns 200 with the HTML shell the browser renders")
     public void homePageIsServedAsHtml() {
         Response response = shop.home();
         Assert.assertEquals(response.statusCode(), 200);
@@ -26,7 +26,7 @@ public class HomeApiTest {
                 "home page should carry the temperature heading");
     }
 
-    @Test
+    @Test(description = "The home page script draws its temperature from exactly one decisive band (cold 1-18 or hot 35-49)")
     public void homePageDrawsTemperatureInADecisiveBand() {
         String body = shop.home().body().asString();
         // The inline script picks one band or the other; both bands must
@@ -38,7 +38,7 @@ public class HomeApiTest {
                 "summer band (35-49) script missing from home page");
     }
 
-    @Test
+    @Test(description = "GET / responds in under 2 seconds")
     public void homePageRespondsQuickly() {
         long millis = shop.home().time();
         Assert.assertTrue(millis < 2_000, "home page took " + millis + "ms");

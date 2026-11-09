@@ -18,7 +18,7 @@ public class ConfirmationApiTest {
 
     private final ShopClient shop = new ShopClient();
 
-    @Test
+    @Test(description = "POST /confirmation renders exactly one outcome heading (PAYMENT SUCCESS or PAYMENT FAILED)")
     public void confirmationRendersExactlyOneOutcome() {
         Response response = shop.confirmation();
         Assert.assertEquals(response.statusCode(), 200);
@@ -29,7 +29,7 @@ public class ConfirmationApiTest {
                 "confirmation should render exactly one outcome heading");
     }
 
-    @Test
+    @Test(description = "At least 30 of 40 confirmations succeed, matching the shop's designed ~95% success rate")
     public void confirmationSucceedsAboutNinetyFivePercentOfTheTime() {
         int successes = 0;
         for (int i = 0; i < SAMPLES; i++) {
