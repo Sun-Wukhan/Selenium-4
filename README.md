@@ -76,6 +76,7 @@ Set as Maven system properties (the `Makefile` variables map to them):
 | `retry.max` | `1` | extra attempts per failed test before it settles as a failure |
 | `property.seed` | `20261103` | seed for the generated cases in `PropertyPurchaseTest` |
 | `shop.baseUrl` | `http://127.0.0.1:6464` | base URL of the shop the API suite tests (`api` module) |
+| `test.environment` | *(derived from the URL)* | label shown in the API and performance reports, e.g. `-Dtest.environment=Staging`; the reports also display the target URL, run start time, Java/OS, and — in CI — the branch, commit and run ID automatically |
 
 ```bash
 mvn -pl client -am test -Dbrowser=firefox -Dheadless=true

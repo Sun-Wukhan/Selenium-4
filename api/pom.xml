@@ -15,6 +15,8 @@
         <!-- The API suite runs against the self-hosted shop by default;
              point it elsewhere with -Dshop.baseUrl=https://... -->
         <shop.baseUrl>http://127.0.0.1:6464</shop.baseUrl>
+        <!-- Optional label shown in the reports, e.g. -Dtest.environment=Staging -->
+        <test.environment></test.environment>
     </properties>
 
     <dependencies>
@@ -51,6 +53,7 @@
                     </suiteXmlFiles>
                     <systemPropertyVariables>
                         <shop.baseUrl>${shop.baseUrl}</shop.baseUrl>
+                        <test.environment>${test.environment}</test.environment>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

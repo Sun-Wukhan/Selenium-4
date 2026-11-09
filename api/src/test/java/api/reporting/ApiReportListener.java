@@ -1,6 +1,6 @@
 package api.reporting;
 
-import api.config.ApiConfig;
+import api.config.TestContext;
 import com.aventstack.extentreports.ExtentReports;
 import com.aventstack.extentreports.ExtentTest;
 import com.aventstack.extentreports.markuputils.MarkupHelper;
@@ -38,9 +38,7 @@ public class ApiReportListener implements ITestListener {
             spark.config().setDocumentTitle("Weather Shopper API Tests");
             extent = new ExtentReports();
             extent.attachReporter(spark);
-            extent.setSystemInfo("Shop base URL", ApiConfig.BASE_URL);
-            extent.setSystemInfo("Java", System.getProperty("java.version"));
-            extent.setSystemInfo("OS", System.getProperty("os.name") + " " + System.getProperty("os.arch"));
+            TestContext.entries().forEach(extent::setSystemInfo);
             extent.setSystemInfo("Suite", context.getSuite().getName());
         } catch (RuntimeException | Error failure) {
             System.err.println("API report could not be initialised: " + failure);

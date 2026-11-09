@@ -1,6 +1,7 @@
 package api.perf;
 
 import api.config.ApiConfig;
+import api.config.TestContext;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -54,6 +55,9 @@ public final class PerfReport {
 
     private static String markdown() {
         StringBuilder out = new StringBuilder("# Performance run\n\n"
+                + "- Environment: " + TestContext.environmentName() + "\n"
+                + "- Target: " + ApiConfig.BASE_URL + "\n"
+                + "- Started: " + TestContext.startedAt() + "\n\n"
                 + "| Workload | Requests | Errors | Mean | p50 | p95 | p99 | Max | Throughput | p95 budget |\n"
                 + "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
         for (Row row : ROWS) {
@@ -114,11 +118,13 @@ public final class PerfReport {
         out.append("<h1>Weather Shopper &mdash; Performance Report</h1>\n");
         out.append("<div class=\"sub\">Generated ")
                 .append(STARTED.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z")))
+                .append(" &middot; environment <strong>").append(escape(TestContext.environmentName())).append("</strong>")
                 .append(" &middot; target <code>").append(escape(ApiConfig.BASE_URL)).append("</code>")
                 .append(" &middot; Java ").append(escape(System.getProperty("java.version")))
                 .append(" &middot; ").append(escape(System.getProperty("os.name")))
                 .append("</div>\n");
         out.append("<div class=\"cards\">")
+                .append(card("Environment", escape(TestContext.environmentName())))
                 .append(card("Workloads", String.valueOf(ROWS.size())))
                 .append(card("Requests", String.valueOf(totalRequests)))
                 .append(card("Errors", String.valueOf(totalErrors)))
@@ -127,6 +133,13 @@ public final class PerfReport {
                         ? "<span class=\"ok\">ALL WITHIN BUDGET</span>"
                         : "<span class=\"bad\">BUDGET EXCEEDED</span>"))
                 .append("</div>\n");
+        java.util.Map<String, String> context = TestContext.entries();
+        if (context.containsKey("Commit")) {
+            out.append("<div class=\"sub\">CI: branch ").append(escape(context.getOrDefault("Branch", "")))
+                    .append(" &middot; commit <code>").append(escape(context.get("Commit"))).append("</code>")
+                    .append(" &middot; run ").append(escape(context.getOrDefault("Run ID", "")))
+                    .append("</div>\n");
+        }
         out.append("<table>\n<tr><th>Workload</th><th>Requests</th><th>Errors</th><th>Mean</th>"
                 + "<th>p50</th><th>p95 vs budget</th><th>p99</th><th>Max</th><th>Throughput</th><th>Verdict</th></tr>\n");
         for (Row row : ROWS) {
