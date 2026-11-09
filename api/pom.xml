@@ -52,4 +52,26 @@
         </plugins>
     </build>
 
+    <profiles>
+        <!-- Performance suite: mvn -pl api test -Pperf
+             Runs testng-perf.xml instead of the contract suite, so the
+             load budgets never gate ordinary builds. -->
+        <profile>
+            <id>perf</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <suiteXmlFiles>
+                                <suiteXmlFile>src/test/resources/testng-perf.xml</suiteXmlFile>
+                            </suiteXmlFiles>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
 </project>
