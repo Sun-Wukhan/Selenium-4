@@ -1,0 +1,40 @@
+# Horniness Index — local Kafka edition.
+#   docker compose -f ci/horniness/docker-compose.yml up --build
+# Starts Redpanda (Kafka-compatible, single container), then runs the four
+# pipeline stages as one-shot services in order, writing the site to
+# ./horniness-site on the host. Set OPENAI_API_KEY in the environment to get
+# AI scoring; without it the deterministic heuristic scores instead.
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.6
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=1G
+      - --overprovisioned
+      - --kafka-addr=internal://0.0.0.0:9092
+      - --advertise-kafka-addr=internal://redpanda:9092
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  pipeline:
+    image: python:3.12-slim
+    working_dir: /repo
+    volumes:
+      - ../..:/repo
+    environment:
+      KAFKA_BOOTSTRAP: redpanda:9092
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    command: >
+      sh -c "pip install -q -r ci/horniness/requirements.txt &&
+             python3 ci/horniness/run_pipeline.py --transport kafka
+             --bootstrap redpanda:9092 --out horniness-site"
