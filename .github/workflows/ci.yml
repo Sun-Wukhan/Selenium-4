@@ -170,13 +170,37 @@ jobs:
             api/target/surefire-reports
           if-no-files-found: warn
 
+  horniness:
+    name: Horniness Index (meme)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build the Horniness Index from live headlines
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python3 ci/horniness-index.py horniness-site
+
+      - name: Upload Horniness Index
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: horniness-index
+          path: horniness-site
+          if-no-files-found: warn
+
   report:
     name: Publish Extent report to GitHub Pages
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     concurrency:
       group: pages
       cancel-in-progress: false
-    needs: [ test, api, perf ]
+    needs: [ test, api, perf, horniness ]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -207,6 +231,18 @@ jobs:
           mkdir -p report-site/api report-site/perf
           cp api-artifact/api-report/index.html report-site/api/index.html
           cp perf-artifact/perf-report.html report-site/perf/index.html
+
+      - name: Download Horniness Index
+        uses: actions/download-artifact@v8
+        with:
+          name: horniness-index
+          path: horniness-artifact
+
+      - name: Add Horniness Index to the site
+        run: |
+          mkdir -p report-site/horniness-index
+          cp horniness-artifact/index.html report-site/horniness-index/index.html
+          cp horniness-artifact/data.json report-site/horniness-index/data.json
 
       - name: Upload Pages site
         uses: actions/upload-pages-artifact@v5
