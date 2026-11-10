@@ -181,10 +181,27 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Build the Horniness Index from live headlines
+      - name: Install pipeline dependencies
+        run: pip install -q -r ci/horniness/requirements.txt
+
+      - name: Start Redpanda (Kafka) broker
+        run: |
+          docker run -d --name redpanda -p 9092:9092 \
+            docker.redpanda.com/redpandadata/redpanda:v24.3.6 \
+            redpanda start --smp 1 --memory 1G --overprovisioned --node-id 0 \
+            --kafka-addr internal://0.0.0.0:9092 \
+            --advertise-kafka-addr internal://127.0.0.1:9092 \
+            --pandaproxy-addr internal://0.0.0.0:8082 \
+            --advertise-pandaproxy-addr internal://127.0.0.1:8082 \
+            --schema-registry-addr internal://0.0.0.0:8081 \
+            --rpc-addr 0.0.0.0:33145 --advertise-rpc-addr 127.0.0.1:33145
+
+      - name: Build the Horniness Index (Kafka pipeline, standalone fallback)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: python3 ci/horniness-index.py horniness-site
+        run: |
+          python3 ci/horniness/run_pipeline.py --transport kafka --bootstrap localhost:9092 --out horniness-site \
+            || python3 ci/horniness-index.py horniness-site
 
       - name: Upload Horniness Index
         if: always()
